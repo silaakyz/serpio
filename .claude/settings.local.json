@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker compose *)",
+      "Bash(docker version *)",
+      "Bash(docker info *)",
+      "Bash(pnpm drizzle-kit *)",
+      "Bash(DATABASE_URL=\"postgresql://serpio:serpio_dev@localhost:5432/serpio_dev\" pnpm drizzle-kit migrate)",
+      "Bash(docker exec serpio_postgres *)",
+      "Bash(pnpm add *)",
+      "Bash(pnpm next *)",
+      "Bash(pnpm dev *)",
+      "WebFetch(domain:localhost)",
+      "Bash(curl -s http://localhost:3000/login -c /tmp/cookies.txt -b /tmp/cookies.txt -X POST -H 'Content-Type: application/x-www-form-urlencoded' --data 'email=test@test.com&password=test' -L -w '\\\\nHTTP_STATUS:%{http_code}')",
+      "Bash(pnpm turbo *)",
+      "Bash(npx playwright *)",
+      "Bash(pnpm tsc *)",
+      "Bash(DATABASE_URL=\"postgresql://serpio:serpio_dev@localhost:5432/serpio_dev\" REDIS_URL=\"redis://localhost:6379\" pnpm dev)",
+      "Bash(docker exec *)",
+      "Bash(redis-cli -h localhost -p 6379 INFO server)",
+      "Bash(DATABASE_URL=\"postgresql://serpio:serpio_dev@localhost:5432/serpio_dev\" REDIS_URL=\"redis://127.0.0.1:6379\" pnpm dev)",
+      "Bash(redis-cli -h 127.0.0.1 -p 6380 INFO server)",
+      "Bash(redis-cli *)",
+      "Bash(DATABASE_URL=\"postgresql://serpio:serpio_dev@localhost:5432/serpio_dev\" REDIS_URL=\"redis://127.0.0.1:6380\" pnpm dev)",
+      "Bash(DATABASE_URL=\"postgresql://serpio:serpio_dev@localhost:5432/serpio_dev\" REDIS_URL=\"redis://127.0.0.1:6380\" AUTH_SECRET=\"4fzi20592Cvl8XWVBufbHTcU7Wxr8i+nxTWzgjk+uL0=\" pnpm dev)",
+      "Bash(curl -s -X POST http://localhost:3003/api/auth/callback/credentials -H 'Content-Type: application/json' -b /tmp/serpio_cookies.txt -c /tmp/serpio_cookies.txt -d '{\"email\":\"test@serpio.dev\",\"password\":\"test123\"}' -L -w '\\\\nHTTP_STATUS:%{http_code}')",
+      "Bash(node --import tsx/esm -e ' *)",
+      "Bash(DATABASE_URL=\"postgresql://serpio:serpio_dev@localhost:5432/serpio_dev\" REDIS_URL=\"redis://127.0.0.1:6380\" npx tsx src/test-scraper.ts https://example.com)",
+      "Bash(DATABASE_URL=\"postgresql://serpio:serpio_dev@localhost:5432/serpio_dev\" REDIS_URL=\"redis://127.0.0.1:6380\" npx tsx src/test-scraper.ts https://blog.mozilla.org)",
+      "Bash(DATABASE_URL=\"postgresql://serpio:serpio_dev@localhost:5432/serpio_dev\" REDIS_URL=\"redis://127.0.0.1:6380\" npx tsx src/inject-job.ts)",
+      "Bash(git init *)",
+      "Bash(git remote *)",
+      "Bash(git add *)"
+    ]
+  }
+}

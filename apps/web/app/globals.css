@@ -1,0 +1,105 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #0A0F1E;
+  --foreground: #E2E8F0;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-inter), Inter, sans-serif;
+}
+
+/* ── Marketing animations ─────────────────────────────── */
+@keyframes fadeInSlideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+@keyframes ctaPulse {
+  0%, 100% { box-shadow: 0 0 40px rgba(0, 255, 135, 0.30); }
+  50%       { box-shadow: 0 0 64px rgba(0, 255, 135, 0.50); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── FullCalendar Dark Mode Overrides ─────────────────── */
+.fc-serpio {
+  --fc-border-color: #1E3A5F;
+  --fc-button-bg-color: #1A2744;
+  --fc-button-border-color: #1E3A5F;
+  --fc-button-hover-bg-color: #1E3A5F;
+  --fc-button-hover-border-color: #00FF87;
+  --fc-button-active-bg-color: #00FF87;
+  --fc-button-active-border-color: #00FF87;
+  --fc-button-text-color: #E2E8F0;
+  --fc-today-bg-color: rgba(0, 255, 135, 0.06);
+  --fc-highlight-color: rgba(0, 255, 135, 0.10);
+  --fc-page-bg-color: transparent;
+  --fc-neutral-bg-color: #0D1526;
+  --fc-list-event-hover-bg-color: #1A2744;
+  --fc-non-business-color: rgba(10, 15, 30, 0.3);
+}
+
+.fc-serpio .fc-toolbar-title {
+  color: #E2E8F0;
+  font-family: Inter, sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.fc-serpio .fc-col-header-cell-cushion,
+.fc-serpio .fc-daygrid-day-number {
+  color: #64748B;
+  font-family: Inter, sans-serif;
+  font-size: 0.75rem;
+  text-decoration: none;
+}
+
+.fc-serpio .fc-daygrid-day-number:hover {
+  color: #E2E8F0;
+}
+
+.fc-serpio td, .fc-serpio th {
+  border-color: #1E3A5F;
+}
+
+.fc-serpio .fc-button-primary:not(:disabled):active,
+.fc-serpio .fc-button-primary.fc-button-active {
+  color: #0A0F1E;
+  background-color: #00FF87;
+  border-color: #00FF87;
+}
+
+.fc-serpio .fc-button-primary {
+  font-family: Inter, sans-serif;
+  font-size: 0.75rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 0.5rem;
+}
+
+.fc-serpio .fc-event {
+  border-radius: 4px;
+  font-size: 0.7rem;
+  padding: 1px 4px;
+  border: none;
+}
+
+.fc-serpio .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+  color: #00FF87;
+  font-weight: 600;
+}

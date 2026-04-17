@@ -1,0 +1,36 @@
+{
+  "name": "@serpio/worker",
+  "version": "0.0.1",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@mozilla/readability": "^0.6.0",
+    "@serpio/database": "workspace:*",
+    "@serpio/types": "workspace:*",
+    "bullmq": "^5.34.2",
+    "cheerio": "^1.2.0",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.36.4",
+    "ioredis": "^5.4.1",
+    "jsdom": "^29.0.2",
+    "p-limit": "^7.3.0",
+    "playwright": "^1.59.1",
+    "postgres": "^3.4.9",
+    "robots-parser": "^3.0.1",
+    "tsx": "^4.21.0",
+    "xml2js": "^0.6.2"
+  },
+  "devDependencies": {
+    "@serpio/config": "workspace:*",
+    "@types/jsdom": "^28.0.1",
+    "@types/node": "^22.10.2",
+    "@types/xml2js": "^0.4.14",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3"
+  }
+}
