@@ -84,6 +84,7 @@ export function ArticleEditor({ article }: Props) {
   const [activeTab, setActiveTab] = useState<ActiveTab>("ai");
   const [saving, setSaving] = useState(false);
   const [rewriting, setRewriting] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
 
   const editor = useEditor({
@@ -142,6 +143,27 @@ export function ArticleEditor({ article }: Props) {
       setSaveMsg("Job tetiklenemedi!");
     } finally {
       setRewriting(false);
+    }
+  }, [article.id, article.projectId, router]);
+
+  const handlePublish = useCallback(async () => {
+    setPublishing(true);
+    try {
+      const res = await fetch("/api/jobs/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: article.projectId, articleId: article.id }),
+      });
+      const data = await res.json() as { jobId?: string; error?: string };
+      if (!res.ok) {
+        setSaveMsg(data.error ?? "Yayınlama başlatılamadı!");
+        return;
+      }
+      router.push(`/dashboard/terminal?jobId=${data.jobId}`);
+    } catch {
+      setSaveMsg("Yayınlama başlatılamadı!");
+    } finally {
+      setPublishing(false);
     }
   }, [article.id, article.projectId, router]);
 
@@ -212,11 +234,12 @@ export function ArticleEditor({ article }: Props) {
           </button>
 
           <button
-            disabled
-            className="px-4 py-2 rounded-lg bg-gold/20 text-gold text-sm font-ui font-semibold opacity-50 cursor-not-allowed"
-            title="FAZ 6'da aktif olacak"
+            onClick={handlePublish}
+            disabled={publishing || article.status !== "ready"}
+            className="px-4 py-2 rounded-lg bg-gold/20 text-gold text-sm font-ui font-semibold hover:bg-gold/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title={article.status !== "ready" ? "Önce 'Onayla & Hazır İşaretle' butonuna basın" : "Yayınla"}
           >
-            Yayınla
+            {publishing ? "Başlatılıyor..." : "Yayınla"}
           </button>
         </div>
       </div>

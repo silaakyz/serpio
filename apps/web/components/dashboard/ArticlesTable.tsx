@@ -74,6 +74,7 @@ export function ArticlesTable({ articles, projectId, initialStatus, initialStale
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [publishingId, setPublishingId] = useState<string | null>(null);
   const [confirmRewriteAll, setConfirmRewriteAll] = useState(false);
   const [styleGuideLoading, setStyleGuideLoading] = useState(false);
   const [rewriteAllLoading, setRewriteAllLoading] = useState(false);
@@ -130,6 +131,31 @@ export function ArticlesTable({ articles, projectId, initialStatus, initialStale
       setStyleGuideLoading(false);
     }
   }, [projectId, router]);
+
+  const handlePublish = useCallback(
+    async (articleId: string) => {
+      if (!projectId) return;
+      setPublishingId(articleId);
+      try {
+        const res = await fetch("/api/jobs/publish", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projectId, articleId }),
+        });
+        const data = await res.json() as { jobId?: string; error?: string };
+        if (!res.ok) {
+          alert(data.error ?? "Yayınlama başlatılamadı.");
+          return;
+        }
+        router.push(`/dashboard/terminal?jobId=${data.jobId}`);
+      } catch {
+        alert("Yayınlama başlatılamadı. Lütfen tekrar deneyin.");
+      } finally {
+        setPublishingId(null);
+      }
+    },
+    [projectId, router]
+  );
 
   const handleRewriteAll = useCallback(async () => {
     if (!projectId) return;
@@ -338,11 +364,12 @@ export function ArticlesTable({ articles, projectId, initialStatus, initialStale
 
                         {/* Yayınla */}
                         <button
-                          disabled={a.status !== "ready"}
+                          onClick={() => a.status === "ready" && handlePublish(a.id)}
+                          disabled={a.status !== "ready" || publishingId === a.id}
                           className="px-2 py-1 rounded text-xs font-ui border border-emerald/30 text-emerald hover:bg-emerald/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                           title={a.status !== "ready" ? "Önce AI ile güncellenmeli" : "Yayınla"}
                         >
-                          Yayınla
+                          {publishingId === a.id ? "..." : "Yayınla"}
                         </button>
                       </div>
                     </td>
