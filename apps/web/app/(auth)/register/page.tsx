@@ -37,7 +37,17 @@ export default function RegisterPage() {
         body: JSON.stringify({ name, email, password }),
       });
 
-      const data = await res.json() as { success?: boolean; error?: string };
+      // Yanıtı önce text olarak al, JSON parse hatasına karşı
+      const text = await res.text();
+      let data: { success?: boolean; error?: string } = {};
+      try {
+        data = JSON.parse(text);
+      } catch {
+        // Sunucu HTML hata sayfası döndürdü
+        console.error("Register API yanıtı:", text.slice(0, 500));
+        setError(`Sunucu hatası (${res.status}). Geliştirici konsolunu kontrol edin.`);
+        return;
+      }
 
       if (!res.ok) {
         setError(data.error ?? "Kayıt sırasında bir hata oluştu.");
@@ -46,7 +56,8 @@ export default function RegisterPage() {
 
       setSuccess(true);
       setTimeout(() => router.push("/login?registered=1"), 1500);
-    } catch {
+    } catch (err) {
+      console.error("Register fetch hatası:", err);
       setError("Sunucuya bağlanılamadı. Lütfen tekrar deneyin.");
     } finally {
       setLoading(false);
