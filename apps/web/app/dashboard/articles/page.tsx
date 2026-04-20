@@ -1,8 +1,9 @@
 import { auth } from "@/lib/auth";
 import { db } from "@serpio/database";
 import { articles, projects } from "@serpio/database";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { ArticlesTable } from "@/components/dashboard/ArticlesTable";
+import Link from "next/link";
 
 interface SearchParams {
   status?: string;
@@ -18,7 +19,6 @@ export default async function ArticlesPage({ searchParams }: Props) {
   const session = await auth();
   if (!session?.user?.id) return null;
 
-  // Kullanıcının ilk projesini al
   const project = await db.query.projects.findFirst({
     where: eq(projects.userId, session.user.id),
     orderBy: (t, { asc }) => [asc(t.createdAt)],
@@ -38,21 +38,20 @@ export default async function ArticlesPage({ searchParams }: Props) {
         <h2 className="text-xl font-ui font-bold text-text">Makaleler</h2>
         <div className="flex items-center gap-2">
           {project && (
-            <span className="text-xs text-muted font-ui">
-              {project.name}
-            </span>
+            <span className="text-xs text-muted font-ui">{project.name}</span>
           )}
-          <button
-            disabled
-            className="px-4 py-2 rounded-lg bg-emerald text-void text-sm font-ui font-semibold opacity-50 cursor-not-allowed"
+          <Link
+            href="/dashboard"
+            className="px-4 py-2 rounded-lg bg-emerald text-void text-sm font-ui font-semibold hover:bg-emerald/90 transition-colors"
           >
             + Yeni Tarama
-          </button>
+          </Link>
         </div>
       </div>
 
       <ArticlesTable
         articles={articlesList}
+        projectId={project?.id}
         initialStatus={searchParams.status}
         initialStale={searchParams.stale}
         initialQ={searchParams.q}

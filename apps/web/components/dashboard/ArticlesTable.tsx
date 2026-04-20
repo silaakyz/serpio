@@ -1,20 +1,21 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { Article } from "@serpio/database";
 
 type StatusFilter = "all" | "scraped" | "analyzing" | "ready" | "scheduled" | "published" | "failed";
 type StaleFilter = "all" | "fresh" | "stale_3m" | "stale_6m" | "stale_9m_plus";
 
 const STATUS_COLORS: Record<string, string> = {
-  scraped:   "bg-subtle/30 text-muted border-subtle/50",
-  analyzing: "bg-sky-500/10 text-sky-400 border-sky-500/30",
-  ready:     "bg-yellow-500/10 text-yellow-400 border-yellow-500/30",
-  scheduled: "bg-orange-500/10 text-orange-400 border-orange-500/30",
-  publishing:"bg-blue-500/10 text-blue-400 border-blue-500/30",
-  published: "bg-emerald/10 text-emerald border-emerald/30",
-  failed:    "bg-red-500/10 text-red-400 border-red-500/30",
+  scraped:    "bg-subtle/30 text-muted border-subtle/50",
+  analyzing:  "bg-sky-500/10 text-sky-400 border-sky-500/30",
+  ready:      "bg-yellow-500/10 text-yellow-400 border-yellow-500/30",
+  scheduled:  "bg-orange-500/10 text-orange-400 border-orange-500/30",
+  publishing: "bg-blue-500/10 text-blue-400 border-blue-500/30",
+  published:  "bg-emerald/10 text-emerald border-emerald/30",
+  failed:     "bg-red-500/10 text-red-400 border-red-500/30",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -23,10 +24,10 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STALE_COLORS: Record<string, string> = {
-  fresh:       "text-emerald",
-  stale_3m:    "text-yellow-400",
-  stale_6m:    "text-orange-400",
-  stale_9m_plus: "text-red-400",
+  fresh:        "text-emerald",
+  stale_3m:     "text-yellow-400",
+  stale_6m:     "text-orange-400",
+  stale_9m_plus:"text-red-400",
 };
 
 const STALE_LABELS: Record<string, string> = {
@@ -50,13 +51,14 @@ function shortUrl(url: string, max = 40): string {
   }
 }
 
-function fmtDate(d: Date | null): string {
+function fmtDate(d: Date | null | undefined): string {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 interface Props {
   articles: Article[];
+  projectId?: string;
   initialStatus?: string;
   initialStale?: string;
   initialQ?: string;
@@ -64,12 +66,17 @@ interface Props {
 
 const PER_PAGE_OPTIONS = [10, 25, 50];
 
-export function ArticlesTable({ articles, initialStatus, initialStale, initialQ }: Props) {
+export function ArticlesTable({ articles, projectId, initialStatus, initialStale, initialQ }: Props) {
+  const router = useRouter();
   const [status, setStatus] = useState<StatusFilter>((initialStatus as StatusFilter) ?? "all");
   const [stale, setStale] = useState<StaleFilter>((initialStale as StaleFilter) ?? "all");
   const [q, setQ] = useState(initialQ ?? "");
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [confirmRewriteAll, setConfirmRewriteAll] = useState(false);
+  const [styleGuideLoading, setStyleGuideLoading] = useState(false);
+  const [rewriteAllLoading, setRewriteAllLoading] = useState(false);
 
   const filtered = useMemo(() => {
     return articles.filter((a) => {
@@ -83,13 +90,126 @@ export function ArticlesTable({ articles, initialStatus, initialStale, initialQ 
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
   const paginated = filtered.slice((page - 1) * perPage, page * perPage);
 
-  const selectClass = "bg-surface border border-border rounded-lg px-3 py-2 text-sm text-text font-ui focus:outline-none focus:border-emerald/50 cursor-pointer";
+  const triggerAiJob = useCallback(
+    async (articleId: string, type: "rewrite" | "analyze") => {
+      if (!projectId) return;
+      setLoadingId(articleId);
+      try {
+        const res = await fetch("/api/jobs/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projectId, articleId, type }),
+        });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        router.push(`/dashboard/terminal?jobId=${data.jobId}`);
+      } catch {
+        alert("Job tetiklenemedi. Lütfen tekrar deneyin.");
+      } finally {
+        setLoadingId(null);
+      }
+    },
+    [projectId, router]
+  );
+
+  const handleStyleGuide = useCallback(async () => {
+    if (!projectId) return;
+    setStyleGuideLoading(true);
+    try {
+      const res = await fetch("/api/jobs/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, type: "style_guide" }),
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      router.push(`/dashboard/terminal?jobId=${data.jobId}`);
+    } catch {
+      alert("Stil rehberi oluşturulamadı.");
+    } finally {
+      setStyleGuideLoading(false);
+    }
+  }, [projectId, router]);
+
+  const handleRewriteAll = useCallback(async () => {
+    if (!projectId) return;
+    setConfirmRewriteAll(false);
+    setRewriteAllLoading(true);
+    try {
+      const res = await fetch("/api/jobs/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, type: "rewrite_all" }),
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      router.push(`/dashboard/terminal?jobId=${data.jobId}`);
+    } catch {
+      alert("Toplu yeniden yazım başlatılamadı.");
+    } finally {
+      setRewriteAllLoading(false);
+    }
+  }, [projectId, router]);
+
+  const selectClass =
+    "bg-surface border border-border rounded-lg px-3 py-2 text-sm text-text font-ui focus:outline-none focus:border-emerald/50 cursor-pointer";
 
   return (
     <div className="space-y-4">
+      {/* Üst aksiyon butonları */}
+      {projectId && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleStyleGuide}
+            disabled={styleGuideLoading}
+            className="px-4 py-2 rounded-lg border border-tech-blue/40 text-tech-blue text-sm font-ui hover:bg-tech-blue/10 transition-colors disabled:opacity-50"
+          >
+            {styleGuideLoading ? "Başlatılıyor..." : "Stil Rehberi Oluştur"}
+          </button>
+
+          <button
+            onClick={() => setConfirmRewriteAll(true)}
+            disabled={rewriteAllLoading}
+            className="px-4 py-2 rounded-lg border border-gold/40 text-gold text-sm font-ui hover:bg-gold/10 transition-colors disabled:opacity-50"
+          >
+            {rewriteAllLoading ? "Başlatılıyor..." : "Tümünü Güncelle"}
+          </button>
+        </div>
+      )}
+
+      {/* Onay dialogu */}
+      {confirmRewriteAll && (
+        <div className="bg-surface border border-gold/40 rounded-xl p-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-ui text-text font-semibold">Tüm eski makaleleri yeniden yaz?</p>
+            <p className="text-xs text-muted font-ui mt-0.5">
+              Her makale 15 kredi tüketir. Bu işlem geri alınamaz.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setConfirmRewriteAll(false)}
+              className="px-3 py-1.5 rounded-lg border border-border text-muted text-xs font-ui hover:text-text transition-colors"
+            >
+              İptal
+            </button>
+            <button
+              onClick={handleRewriteAll}
+              className="px-3 py-1.5 rounded-lg bg-gold text-void text-xs font-ui font-semibold hover:bg-gold/90 transition-colors"
+            >
+              Evet, Tümünü Güncelle
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Filtreler */}
       <div className="flex flex-wrap gap-3">
-        <select value={status} onChange={(e) => { setStatus(e.target.value as StatusFilter); setPage(1); }} className={selectClass}>
+        <select
+          value={status}
+          onChange={(e) => { setStatus(e.target.value as StatusFilter); setPage(1); }}
+          className={selectClass}
+        >
           <option value="all">Tüm Durumlar</option>
           <option value="scraped">Tarandı</option>
           <option value="analyzing">Analiz Ediliyor</option>
@@ -99,7 +219,11 @@ export function ArticlesTable({ articles, initialStatus, initialStale, initialQ 
           <option value="failed">Başarısız</option>
         </select>
 
-        <select value={stale} onChange={(e) => { setStale(e.target.value as StaleFilter); setPage(1); }} className={selectClass}>
+        <select
+          value={stale}
+          onChange={(e) => { setStale(e.target.value as StaleFilter); setPage(1); }}
+          className={selectClass}
+        >
           <option value="all">Tüm Eskimeler</option>
           <option value="fresh">Güncel</option>
           <option value="stale_3m">3–6 ay</option>
@@ -123,7 +247,10 @@ export function ArticlesTable({ articles, initialStatus, initialStale, initialQ 
             <thead>
               <tr className="border-b border-border bg-elevated/50">
                 {["Başlık", "URL", "Durum", "Eskime", "GEO Skoru", "Son Güncelleme", "Aksiyonlar"].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-muted font-medium text-xs uppercase tracking-wider whitespace-nowrap">
+                  <th
+                    key={h}
+                    className="text-left px-4 py-3 text-muted font-medium text-xs uppercase tracking-wider whitespace-nowrap"
+                  >
                     {h}
                   </th>
                 ))}
@@ -139,7 +266,10 @@ export function ArticlesTable({ articles, initialStatus, initialStale, initialQ 
                         : "Filtre kriterlerine uyan makale bulunamadı."}
                     </p>
                     {articles.length === 0 && (
-                      <Link href="/dashboard" className="mt-3 inline-flex items-center text-emerald text-xs hover:underline">
+                      <Link
+                        href="/dashboard"
+                        className="mt-3 inline-flex items-center text-emerald text-xs hover:underline"
+                      >
                         → Tarama başlat
                       </Link>
                     )}
@@ -147,9 +277,14 @@ export function ArticlesTable({ articles, initialStatus, initialStale, initialQ 
                 </tr>
               ) : (
                 paginated.map((a) => (
-                  <tr key={a.id} className="border-b border-border/50 hover:bg-elevated/40 transition-colors">
+                  <tr
+                    key={a.id}
+                    className="border-b border-border/50 hover:bg-elevated/40 transition-colors"
+                  >
                     <td className="px-4 py-3 max-w-[200px]">
-                      <p className="text-text truncate" title={a.title}>{a.title || "—"}</p>
+                      <p className="text-text truncate" title={a.title}>
+                        {a.title || "—"}
+                      </p>
                     </td>
                     <td className="px-4 py-3 max-w-[180px]">
                       <a
@@ -163,7 +298,9 @@ export function ArticlesTable({ articles, initialStatus, initialStale, initialQ 
                       </a>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs border ${STATUS_COLORS[a.status] ?? "text-muted"}`}>
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs border ${STATUS_COLORS[a.status] ?? "text-muted"}`}
+                      >
                         {STATUS_LABELS[a.status] ?? a.status}
                       </span>
                     </td>
@@ -181,7 +318,33 @@ export function ArticlesTable({ articles, initialStatus, initialStale, initialQ 
                       {fmtDate(a.lastModifiedAt ?? a.originalPublishedAt ?? a.createdAt)}
                     </td>
                     <td className="px-4 py-3">
-                      <button disabled className="text-xs text-muted opacity-40 cursor-not-allowed">···</button>
+                      <div className="flex items-center gap-1.5 whitespace-nowrap">
+                        {/* AI Güncelle */}
+                        <button
+                          onClick={() => triggerAiJob(a.id, "rewrite")}
+                          disabled={loadingId === a.id || a.status === "analyzing"}
+                          className="px-2 py-1 rounded text-xs font-ui border border-tech-blue/30 text-tech-blue hover:bg-tech-blue/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {loadingId === a.id ? "..." : "AI Güncelle"}
+                        </button>
+
+                        {/* Düzenle */}
+                        <Link
+                          href={`/dashboard/articles/${a.id}/editor`}
+                          className="px-2 py-1 rounded text-xs font-ui border border-border text-muted hover:text-text hover:border-border/80 transition-colors"
+                        >
+                          Düzenle
+                        </Link>
+
+                        {/* Yayınla */}
+                        <button
+                          disabled={a.status !== "ready"}
+                          className="px-2 py-1 rounded text-xs font-ui border border-emerald/30 text-emerald hover:bg-emerald/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                          title={a.status !== "ready" ? "Önce AI ile güncellenmeli" : "Yayınla"}
+                        >
+                          Yayınla
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -199,7 +362,9 @@ export function ArticlesTable({ articles, initialStatus, initialStale, initialQ 
               onChange={(e) => { setPerPage(Number(e.target.value)); setPage(1); }}
               className="bg-elevated border border-border rounded px-2 py-1 text-text focus:outline-none"
             >
-              {PER_PAGE_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
+              {PER_PAGE_OPTIONS.map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
             </select>
             <span>/ {filtered.length} makale</span>
           </div>
@@ -211,7 +376,9 @@ export function ArticlesTable({ articles, initialStatus, initialStale, initialQ 
             >
               ← Önceki
             </button>
-            <span className="px-3 py-1.5 text-xs text-muted font-ui">{page} / {totalPages}</span>
+            <span className="px-3 py-1.5 text-xs text-muted font-ui">
+              {page} / {totalPages}
+            </span>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
