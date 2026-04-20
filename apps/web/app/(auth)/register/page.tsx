@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 
 function GoogleIcon() {
@@ -16,21 +17,40 @@ function GoogleIcon() {
 }
 
 export default function RegisterPage() {
+  const router = useRouter();
   const [name, setName]         = useState("");
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState("");
+  const [success, setSuccess]   = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    // Şimdilik credentials ile giriş yap — gerçek kayıt API'si FAZ sonrası
-    await signIn("credentials", {
-      email,
-      password,
-      redirect: true,
-      callbackUrl: "/dashboard",
-    });
+    setError("");
+
+    try {
+      const res = await fetch("/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password }),
+      });
+
+      const data = await res.json() as { success?: boolean; error?: string };
+
+      if (!res.ok) {
+        setError(data.error ?? "Kayıt sırasında bir hata oluştu.");
+        return;
+      }
+
+      setSuccess(true);
+      setTimeout(() => router.push("/login?registered=1"), 1500);
+    } catch {
+      setError("Sunucuya bağlanılamadı. Lütfen tekrar deneyin.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGoogle = () => {
@@ -153,9 +173,23 @@ export default function RegisterPage() {
             />
           </div>
 
+          {error && (
+            <p className="text-sm text-red-400 text-center rounded-lg py-2 px-3"
+               style={{ backgroundColor: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)" }}>
+              {error}
+            </p>
+          )}
+
+          {success && (
+            <p className="text-sm text-center rounded-lg py-2 px-3"
+               style={{ color: "#00FF87", backgroundColor: "rgba(0,255,135,0.1)", border: "1px solid rgba(0,255,135,0.3)" }}>
+              Kayıt başarılı! Giriş sayfasına yönlendiriliyorsunuz...
+            </p>
+          )}
+
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || success}
             className="w-full py-3 px-4 rounded-xl text-sm font-bold transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
             style={{ backgroundColor: "#00FF87", color: "#0A0F1E" }}
             onMouseEnter={(e) => {
@@ -165,7 +199,7 @@ export default function RegisterPage() {
               e.currentTarget.style.backgroundColor = "#00FF87";
             }}
           >
-            {loading ? "Hesap oluşturuluyor..." : "Ücretsiz Başla →"}
+            {loading ? "Hesap oluşturuluyor..." : success ? "Yönlendiriliyor..." : "Ücretsiz Başla →"}
           </button>
         </form>
 

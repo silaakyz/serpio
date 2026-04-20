@@ -1,31 +1,13 @@
 import type { NextAuthConfig } from "next-auth";
-import Credentials from "next-auth/providers/credentials";
 
 /**
  * Edge-compatible auth config (adapter YOK — postgres çalışmaz Edge'de)
  * Sadece middleware ve JWT kontrol için kullanılır.
  */
 export const authConfig: NextAuthConfig = {
-  providers: [
-    // DEV ONLY: production'da kaldır
-    Credentials({
-      name: "credentials",
-      credentials: {
-        email:    { label: "Email",    type: "email"    },
-        password: { label: "Password", type: "password" },
-      },
-      async authorize(credentials) {
-        if (process.env.NODE_ENV === "development" && credentials?.email) {
-          return {
-            id:    "dev-user-1",
-            email: credentials.email as string,
-            name:  "Dev User",
-          };
-        }
-        return null;
-      },
-    }),
-  ],
+  // Credentials provider auth.ts'de tanımlanır (Node.js runtime gerektirir).
+  // Edge middleware bu config'i kullanır; sadece JWT/session kontrolü yapar.
+  providers: [],
   session: { strategy: "jwt" },
   pages: {
     signIn: "/login",

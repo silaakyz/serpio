@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 
 function GoogleIcon() {
@@ -27,7 +28,10 @@ function GoogleIcon() {
   );
 }
 
-export default function LoginPage() {
+function LoginForm() {
+  const searchParams = useSearchParams();
+  const justRegistered = searchParams.get("registered") === "1";
+
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading]   = useState(false);
@@ -165,8 +169,18 @@ export default function LoginPage() {
             />
           </div>
 
+          {justRegistered && !error && (
+            <p className="text-sm text-center rounded-lg py-2 px-3"
+               style={{ color: "#00FF87", backgroundColor: "rgba(0,255,135,0.1)", border: "1px solid rgba(0,255,135,0.3)" }}>
+              Kayıt başarılı! Şimdi giriş yapabilirsiniz.
+            </p>
+          )}
+
           {error && (
-            <p className="text-sm text-red-400 text-center">{error}</p>
+            <p className="text-sm text-red-400 text-center rounded-lg py-2 px-3"
+               style={{ backgroundColor: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)" }}>
+              {error}
+            </p>
           )}
 
           <button
@@ -200,5 +214,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }
