@@ -7,7 +7,7 @@ import { generateStyleGuide } from "../services/style-guide.service";
 import { rewriteArticle } from "../services/ai-rewrite.service";
 import { generateLinkSuggestions } from "../services/linker.service";
 import { log } from "../utils/logger";
-import { consumeCredits } from "../utils/credit";
+import { consumeCredits, refundCredits } from "../utils/credit";
 
 const connection = new Redis(process.env.REDIS_URL ?? "redis://127.0.0.1:6380", {
   maxRetriesPerRequest: null,
@@ -108,10 +108,25 @@ const aiWorker = new Worker<AiJobData>(
       const message = err instanceof Error ? err.message : String(err);
       await log(dbJobId, "error", `AI hatası: ${message}`);
       await db.update(jobs).set({ status: "failed", error: message }).where(jobFilter);
+      // Yetersiz kredi hatası değilse → ödenen kredileri iade et
+      if (message !== "Yetersiz kredi") {
+        const refundMap: Record<string, number> = {
+          style_guide: 20, analyze: 5, rewrite: 15,
+        };
+        const refundAmt = refundMap[type] ?? 0;
+        if (refundAmt > 0) {
+          await refundCredits(userId, refundAmt, `İade: AI ${type} başarısız`, dbJobId)
+            .catch(() => undefined);
+        }
+      }
       throw err;
     }
   },
-  { connection, concurrency: 1 }
+  {
+    connection,
+    concurrency: 1,
+    limiter: { max: 3, duration: 60_000 },
+  }
 );
 
 export default aiWorker;

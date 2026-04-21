@@ -4,7 +4,7 @@ import { db } from "../lib/db";
 import { jobs, articles, projects } from "@serpio/database";
 import { eq } from "drizzle-orm";
 import { log } from "../utils/logger";
-import { consumeCredits } from "../utils/credit";
+import { consumeCredits, refundCredits } from "../utils/credit";
 import { publishToWordPress } from "../services/wordpress.service";
 import { publishToGitHub } from "../services/github.service";
 import { publishToFTP } from "../services/ftp.service";
@@ -160,10 +160,20 @@ const publishWorker = new Worker<PublishJobData>(
         .update(articles)
         .set({ status: "failed" })
         .where(eq(articles.id, articleId));
+      // Yetersiz kredi hatası değilse → ödenen kredileri iade et
+      if (message !== "Yetersiz kredi") {
+        const activeChannel = channel ?? "unknown";
+        const refundAmt = CHANNEL_CREDIT[activeChannel] ?? 2;
+        await refundCredits(userId, refundAmt, `İade: yayınlama başarısız (${activeChannel})`, dbJobId)
+          .catch(() => undefined);
+      }
       throw err;
     }
   },
-  { connection, concurrency: 2 }
+  {
+    connection,
+    concurrency: 3,
+  }
 );
 
 export default publishWorker;

@@ -250,12 +250,14 @@ export const articles = pgTable(
     updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   },
   (table) => ({
-    projectIdIdx:   index("articles_project_id_idx").on(table.projectId),
-    statusIdx:      index("articles_status_idx").on(table.status),
-    staleIdx:       index("articles_stale_status_idx").on(table.staleStatus),
-    scheduledIdx:   index("articles_scheduled_at_idx").on(table.scheduledAt),
-    originalUrlIdx: uniqueIndex("articles_original_url_idx").on(table.originalUrl),
-    geoScoreIdx:    index("articles_geo_score_idx").on(table.geoScore),
+    projectIdIdx:       index("articles_project_id_idx").on(table.projectId),
+    statusIdx:          index("articles_status_idx").on(table.status),
+    staleIdx:           index("articles_stale_status_idx").on(table.staleStatus),
+    scheduledIdx:       index("articles_scheduled_at_idx").on(table.scheduledAt),
+    originalUrlIdx:     uniqueIndex("articles_original_url_idx").on(table.originalUrl),
+    geoScoreIdx:        index("articles_geo_score_idx").on(table.geoScore),
+    // Composite — en sık kullanılan sorgu: proje + durum filtresi
+    projectStatusIdx:   index("articles_project_status_idx").on(table.projectId, table.status),
   })
 );
 
@@ -300,10 +302,13 @@ export const jobs = pgTable(
     updatedAt:   timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   },
   (table) => ({
-    projectIdIdx:   index("jobs_project_id_idx").on(table.projectId),
-    statusIdx:      index("jobs_status_idx").on(table.status),
-    typeIdx:        index("jobs_type_idx").on(table.type),
-    bullmqJobIdIdx: uniqueIndex("jobs_bullmq_job_id_idx").on(table.bullmqJobId),
+    projectIdIdx:    index("jobs_project_id_idx").on(table.projectId),
+    statusIdx:       index("jobs_status_idx").on(table.status),
+    typeIdx:         index("jobs_type_idx").on(table.type),
+    bullmqJobIdIdx:  uniqueIndex("jobs_bullmq_job_id_idx").on(table.bullmqJobId),
+    // Composite + yeni
+    projectStatusIdx: index("jobs_project_status_idx").on(table.projectId, table.status),
+    createdAtIdx:     index("jobs_created_at_idx").on(table.createdAt),
   })
 );
 
@@ -320,8 +325,9 @@ export const jobLogs = pgTable(
     createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   },
   (table) => ({
-    jobIdIdx:   index("job_logs_job_id_idx").on(table.jobId),
-    createdIdx: index("job_logs_created_at_idx").on(table.createdAt),
+    jobIdIdx:    index("job_logs_job_id_idx").on(table.jobId),
+    createdIdx:  index("job_logs_created_at_idx").on(table.createdAt),
+    jobLevelIdx: index("job_logs_job_level_idx").on(table.jobId, table.level),
   })
 );
 
@@ -341,8 +347,9 @@ export const creditTransactions = pgTable(
     createdAt:   timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   },
   (table) => ({
-    userIdIdx:  index("credit_tx_user_id_idx").on(table.userId),
-    createdIdx: index("credit_tx_created_at_idx").on(table.createdAt),
+    userIdIdx:      index("credit_tx_user_id_idx").on(table.userId),
+    createdIdx:     index("credit_tx_created_at_idx").on(table.createdAt),
+    userCreatedIdx: index("credit_tx_user_created_idx").on(table.userId, table.createdAt),
   })
 );
 

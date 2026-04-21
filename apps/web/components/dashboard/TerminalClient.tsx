@@ -93,10 +93,11 @@ export function TerminalClient({ initialJobId }: TerminalClientProps) {
   const [lines, setLines] = useState<TerminalLine[]>(makeSystemLines);
   const [input, setInput] = useState("");
   const [activeJobId, setActiveJobId] = useState<string | null>(initialJobId ?? null);
-  const [isConnected, setIsConnected] = useState(false);
+  const [connStatus, setConnStatus] = useState<"idle" | "connecting" | "live" | "reconnecting" | "lost">("idle");
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const esRef = useRef<EventSource | null>(null);
+  const reconnectAttemptsRef = useRef(0);
 
   // Auto-scroll
   useEffect(() => {
@@ -110,20 +111,21 @@ export function TerminalClient({ initialJobId }: TerminalClientProps) {
     setLines((prev) => [...prev, { id: nextId++, level, text, ts: now }]);
   }, []);
 
-  // SSE bağlantısı
-  useEffect(() => {
-    if (!activeJobId) return;
-
+  const connectSSE = useCallback((jobId: string) => {
     esRef.current?.close();
+    setConnStatus("connecting");
 
-    const es = new EventSource(`/api/stream/${activeJobId}`);
+    const es = new EventSource(`/api/stream/${jobId}`);
     esRef.current = es;
-    setIsConnected(true);
-    pushLine("info", `İş izleniyor: ${activeJobId}`);
+
+    es.onopen = () => {
+      setConnStatus("live");
+      reconnectAttemptsRef.current = 0;
+    };
 
     es.onmessage = (ev) => {
       try {
-        const data: LogEntry = JSON.parse(ev.data);
+        const data = JSON.parse(ev.data) as { level: string; message: string; timestamp: string };
         pushLine(data.level as TerminalLine["level"], data.message, fmtTs(data.timestamp));
       } catch {
         /* skip ping/malformed */
@@ -131,15 +133,33 @@ export function TerminalClient({ initialJobId }: TerminalClientProps) {
     };
 
     es.onerror = () => {
-      setIsConnected(false);
-      es.close();
+      reconnectAttemptsRef.current += 1;
+
+      if (reconnectAttemptsRef.current >= 4) {
+        // 4 başarısız denemeden sonra tamamen kes
+        setConnStatus("lost");
+        es.close();
+        pushLine("error", "Bağlantı kurulamadı. Sayfayı yenileyip tekrar deneyin.");
+      } else {
+        setConnStatus("reconnecting");
+        // EventSource otomatik yeniden bağlanır — sadece durumu güncelle
+      }
     };
+  }, [pushLine]);
+
+  // SSE bağlantısı
+  useEffect(() => {
+    if (!activeJobId) return;
+
+    reconnectAttemptsRef.current = 0;
+    pushLine("info", `İş izleniyor: ${activeJobId}`);
+    connectSSE(activeJobId);
 
     return () => {
-      es.close();
-      setIsConnected(false);
+      esRef.current?.close();
+      setConnStatus("idle");
     };
-  }, [activeJobId, pushLine]);
+  }, [activeJobId, pushLine, connectSSE]);
 
   const runCommand = useCallback((cmd: string) => {
     const trimmed = cmd.trim().toLowerCase();
@@ -188,10 +208,18 @@ export function TerminalClient({ initialJobId }: TerminalClientProps) {
           {activeJobId && (
             <span className="ml-2 flex items-center gap-1.5 text-xs font-ui" style={{ color: "#64748B" }}>
               <span
-                className={`w-2 h-2 rounded-full ${isConnected ? "animate-pulse" : ""}`}
-                style={{ backgroundColor: isConnected ? "#00FF87" : "#64748B" }}
+                className={`w-2 h-2 rounded-full ${connStatus === "live" ? "animate-pulse" : connStatus === "reconnecting" ? "animate-ping" : ""}`}
+                style={{
+                  backgroundColor:
+                    connStatus === "live" ? "#00FF87" :
+                    connStatus === "reconnecting" || connStatus === "connecting" ? "#F59E0B" :
+                    "#FF4444"
+                }}
               />
-              {isConnected ? "canlı" : "bağlantı kesildi"}
+              {connStatus === "live" ? "canlı" :
+               connStatus === "connecting" ? "bağlanıyor..." :
+               connStatus === "reconnecting" ? "yeniden bağlanıyor..." :
+               "bağlantı kesildi"}
             </span>
           )}
         </div>
@@ -200,6 +228,19 @@ export function TerminalClient({ initialJobId }: TerminalClientProps) {
             <span className="text-[10px] font-ui" style={{ color: "#334155" }}>
               #{activeJobId.slice(0, 8)}
             </span>
+          )}
+          {activeJobId && connStatus === "lost" && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                reconnectAttemptsRef.current = 0;
+                connectSSE(activeJobId);
+              }}
+              className="text-xs transition-colors font-ui"
+              style={{ color: "#00FF87" }}
+            >
+              Yeniden Bağlan
+            </button>
           )}
           <button
             onClick={(e) => {

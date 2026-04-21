@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import type { Article } from "@serpio/database";
 
 type StatusFilter = "all" | "scraped" | "analyzing" | "ready" | "scheduled" | "published" | "failed";
@@ -78,6 +79,14 @@ export function ArticlesTable({ articles, projectId, initialStatus, initialStale
   const [confirmRewriteAll, setConfirmRewriteAll] = useState(false);
   const [styleGuideLoading, setStyleGuideLoading] = useState(false);
   const [rewriteAllLoading, setRewriteAllLoading] = useState(false);
+  const [userCredits, setUserCredits] = useState<number>(999);
+
+  useEffect(() => {
+    fetch("/api/credits/balance")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.credits != null) setUserCredits(d.credits); })
+      .catch(() => undefined);
+  }, []);
 
   const filtered = useMemo(() => {
     return articles.filter((a) => {
@@ -95,17 +104,19 @@ export function ArticlesTable({ articles, projectId, initialStatus, initialStale
     async (articleId: string, type: "rewrite" | "analyze") => {
       if (!projectId) return;
       setLoadingId(articleId);
+      const tid = toast.loading(type === "rewrite" ? "AI güncelleme kuyruğa ekleniyor 🤖" : "Analiz başlatılıyor...");
       try {
         const res = await fetch("/api/jobs/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ projectId, articleId, type }),
         });
-        if (!res.ok) throw new Error();
         const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "Job tetiklenemedi");
+        toast.success("AI güncelleme kuyruğa eklendi 🤖", { id: tid });
         router.push(`/dashboard/terminal?jobId=${data.jobId}`);
-      } catch {
-        alert("Job tetiklenemedi. Lütfen tekrar deneyin.");
+      } catch (err) {
+        toast.error(`Hata: ${err instanceof Error ? err.message : "Job tetiklenemedi"}`, { id: tid });
       } finally {
         setLoadingId(null);
       }
@@ -116,17 +127,19 @@ export function ArticlesTable({ articles, projectId, initialStatus, initialStale
   const handleStyleGuide = useCallback(async () => {
     if (!projectId) return;
     setStyleGuideLoading(true);
+    const tid = toast.loading("Stil rehberi oluşturuluyor...");
     try {
       const res = await fetch("/api/jobs/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId, type: "style_guide" }),
       });
-      if (!res.ok) throw new Error();
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Stil rehberi başlatılamadı");
+      toast.success("Stil rehberi kuyruğa eklendi ✓", { id: tid });
       router.push(`/dashboard/terminal?jobId=${data.jobId}`);
-    } catch {
-      alert("Stil rehberi oluşturulamadı.");
+    } catch (err) {
+      toast.error(`Hata: ${err instanceof Error ? err.message : "Stil rehberi oluşturulamadı"}`, { id: tid });
     } finally {
       setStyleGuideLoading(false);
     }
@@ -136,6 +149,7 @@ export function ArticlesTable({ articles, projectId, initialStatus, initialStale
     async (articleId: string) => {
       if (!projectId) return;
       setPublishingId(articleId);
+      const tid = toast.loading("Yayınlama kuyruğa ekleniyor...");
       try {
         const res = await fetch("/api/jobs/publish", {
           method: "POST",
@@ -143,13 +157,11 @@ export function ArticlesTable({ articles, projectId, initialStatus, initialStale
           body: JSON.stringify({ projectId, articleId }),
         });
         const data = await res.json() as { jobId?: string; error?: string };
-        if (!res.ok) {
-          alert(data.error ?? "Yayınlama başlatılamadı.");
-          return;
-        }
+        if (!res.ok) throw new Error(data.error ?? "Yayınlama başlatılamadı");
+        toast.success("Yayınlama başlatıldı ✓", { id: tid });
         router.push(`/dashboard/terminal?jobId=${data.jobId}`);
-      } catch {
-        alert("Yayınlama başlatılamadı. Lütfen tekrar deneyin.");
+      } catch (err) {
+        toast.error(`Hata: ${err instanceof Error ? err.message : "Yayınlama başlatılamadı"}`, { id: tid });
       } finally {
         setPublishingId(null);
       }
@@ -161,17 +173,19 @@ export function ArticlesTable({ articles, projectId, initialStatus, initialStale
     if (!projectId) return;
     setConfirmRewriteAll(false);
     setRewriteAllLoading(true);
+    const tid = toast.loading("Toplu yeniden yazım başlatılıyor...");
     try {
       const res = await fetch("/api/jobs/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId, type: "rewrite_all" }),
       });
-      if (!res.ok) throw new Error();
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Toplu yazım başlatılamadı");
+      toast.success("Toplu yeniden yazım kuyruğa eklendi 🤖", { id: tid });
       router.push(`/dashboard/terminal?jobId=${data.jobId}`);
-    } catch {
-      alert("Toplu yeniden yazım başlatılamadı.");
+    } catch (err) {
+      toast.error(`Hata: ${err instanceof Error ? err.message : "Toplu yazım başlatılamadı"}`, { id: tid });
     } finally {
       setRewriteAllLoading(false);
     }
@@ -347,8 +361,9 @@ export function ArticlesTable({ articles, projectId, initialStatus, initialStale
                       <div className="flex items-center gap-1.5 whitespace-nowrap">
                         {/* AI Güncelle */}
                         <button
-                          onClick={() => triggerAiJob(a.id, "rewrite")}
-                          disabled={loadingId === a.id || a.status === "analyzing"}
+                          onClick={() => userCredits >= 15 && triggerAiJob(a.id, "rewrite")}
+                          disabled={loadingId === a.id || a.status === "analyzing" || userCredits < 15}
+                          title={userCredits < 15 ? `Yetersiz kredi (gerekli: 15, mevcut: ${userCredits})` : ""}
                           className="px-2 py-1 rounded text-xs font-ui border border-tech-blue/30 text-tech-blue hover:bg-tech-blue/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           {loadingId === a.id ? "..." : "AI Güncelle"}
@@ -364,10 +379,13 @@ export function ArticlesTable({ articles, projectId, initialStatus, initialStale
 
                         {/* Yayınla */}
                         <button
-                          onClick={() => a.status === "ready" && handlePublish(a.id)}
-                          disabled={a.status !== "ready" || publishingId === a.id}
+                          onClick={() => a.status === "ready" && userCredits >= 2 && handlePublish(a.id)}
+                          disabled={a.status !== "ready" || publishingId === a.id || userCredits < 2}
                           className="px-2 py-1 rounded text-xs font-ui border border-emerald/30 text-emerald hover:bg-emerald/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                          title={a.status !== "ready" ? "Önce AI ile güncellenmeli" : "Yayınla"}
+                          title={
+                            userCredits < 2    ? `Yetersiz kredi (gerekli: 2, mevcut: ${userCredits})` :
+                            a.status !== "ready" ? "Önce AI ile güncellenmeli" : "Yayınla"
+                          }
                         >
                           {publishingId === a.id ? "..." : "Yayınla"}
                         </button>

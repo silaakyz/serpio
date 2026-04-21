@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 interface Props {
   userId: string;
@@ -50,9 +51,12 @@ export function ScrapeStarter({ userId }: Props) {
       }
 
       const { jobId } = await jobRes.json();
+      toast.success("Tarama başlatıldı ⚡");
       router.push(`/dashboard/terminal?jobId=${jobId}`);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Bir hata oluştu");
+      const msg = err instanceof Error ? err.message : "Bir hata oluştu";
+      setError(msg);
+      toast.error(`Hata: ${msg}`);
       setLoading(false);
     }
   };

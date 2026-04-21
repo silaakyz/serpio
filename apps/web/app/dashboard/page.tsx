@@ -99,6 +99,29 @@ export default async function DashboardPage() {
         <p className="mt-1 text-sm text-muted font-ui">İşte projenizin güncel durumu.</p>
       </div>
 
+      {/* Düşük kredi uyarı banner */}
+      {credits < 50 && (
+        <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-xl text-sm font-ui"
+             style={{
+               backgroundColor: credits <= 10 ? "rgba(239,68,68,0.08)" : "rgba(245,158,11,0.08)",
+               border: `1px solid ${credits <= 10 ? "rgba(239,68,68,0.3)" : "rgba(245,158,11,0.3)"}`,
+               color: credits <= 10 ? "#FF4444" : "#F59E0B",
+             }}>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full animate-pulse flex-shrink-0"
+                  style={{ backgroundColor: credits <= 10 ? "#FF4444" : "#F59E0B" }} />
+            {credits <= 10
+              ? `Krediniz kritik düzeyde düşük (${credits} kredi). İşlemler durabilir.`
+              : `Krediniz azalıyor (${credits} kredi). İşlemlerinizin kesintisiz devam etmesi için kredi satın alın.`}
+          </div>
+          <Link href="/dashboard/credits"
+                className="flex-shrink-0 text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors"
+                style={{ backgroundColor: credits <= 10 ? "rgba(239,68,68,0.15)" : "rgba(245,158,11,0.15)" }}>
+            Kredi Al →
+          </Link>
+        </div>
+      )}
+
       {/* İstatistik Kartları */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((s) => (

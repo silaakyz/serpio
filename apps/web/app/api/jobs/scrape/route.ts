@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { rateLimit } from "@/lib/rate-limit";
 import { db } from "@serpio/database";
 import { jobs, projects } from "@serpio/database";
 import { eq } from "drizzle-orm";
@@ -15,12 +16,25 @@ interface ScrapePayload {
   maxPages: number;
 }
 
-const _redis = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379", {
+const _redis = new Redis(process.env.REDIS_URL ?? "redis://127.0.0.1:6380", {
   maxRetriesPerRequest: null,
 });
-const scrapeQueue = new Queue<ScrapePayload>("scrape", { connection: _redis });
+const scrapeQueue = new Queue<ScrapePayload>("scrape", {
+  connection: _redis,
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: "exponential", delay: 5000 },
+    removeOnComplete: { count: 100, age: 86400 },
+    removeOnFail: false,
+  },
+});
 
 export async function POST(req: NextRequest) {
+  const { success } = rateLimit(req, 10, 60_000);
+  if (!success) {
+    return NextResponse.json({ error: "Çok fazla istek. Lütfen bekleyin." }, { status: 429 });
+  }
+
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

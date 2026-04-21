@@ -9,6 +9,7 @@ const pageTitles: Record<string, string> = {
   "/dashboard/articles": "Makaleler",
   "/dashboard/calendar": "Takvim",
   "/dashboard/terminal": "Terminal",
+  "/dashboard/credits":  "Krediler",
   "/dashboard/settings": "Proje Ayarları",
   "/dashboard/notifications": "Bildirimler",
   "/dashboard/programmatic": "Programatik SEO",

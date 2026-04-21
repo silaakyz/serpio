@@ -5,9 +5,9 @@ import { articles, jobs } from "@serpio/database";
 import { eq } from "drizzle-orm";
 import { UniversalScraper } from "../services/scraper.service";
 import { log } from "../utils/logger";
-import { consumeCredits } from "../utils/credit";
+import { consumeCredits, refundCredits } from "../utils/credit";
 
-const connection = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379", {
+const connection = new Redis(process.env.REDIS_URL ?? "redis://127.0.0.1:6380", {
   maxRetriesPerRequest: null,
 });
 
@@ -23,6 +23,7 @@ interface ScrapeJobData {
 const scrapeWorker = new Worker<ScrapeJobData>(
   "scrape",
   async (job: Job<ScrapeJobData>) => {
+
     const { projectId, userId, url, jobDbId, maxDepth, maxPages } = job.data;
     const jobId = jobDbId; // log için jobs tablosundaki id'yi kullan
 
@@ -32,11 +33,12 @@ const scrapeWorker = new Worker<ScrapeJobData>(
       .where(eq(jobs.id, jobId))
       .catch(() => undefined);
 
+    const creditCost = 10;
+
     try {
       await log(jobId, "info", `Scraping başlatılıyor → ${url}`);
 
       // Kredi kontrolü ve tüketimi
-      const creditCost = 10;
       const credited = await consumeCredits(userId, creditCost, `Scraping: ${url}`, jobId);
       if (!credited) {
         await log(jobId, "error", "Yetersiz kredi! İşlem iptal edildi.");
@@ -125,10 +127,19 @@ const scrapeWorker = new Worker<ScrapeJobData>(
         .set({ status: "failed", error: message })
         .where(eq(jobs.id, jobId))
         .catch(() => undefined);
+      // Yetersiz kredi hatası değilse → ödenen kredileri iade et
+      if (message !== "Yetersiz kredi") {
+        await refundCredits(userId, creditCost, `İade: scraping başarısız — ${url}`, jobId)
+          .catch(() => undefined);
+      }
       throw err;
     }
   },
-  { connection, concurrency: 2 }
+  {
+    connection,
+    concurrency: 2,
+    limiter: { max: 5, duration: 10_000 },
+  }
 );
 
 scrapeWorker.on("failed", (job, err) => {

@@ -1,10 +1,8 @@
-import OpenAI from "openai";
 import { db } from "../lib/db";
 import { articles, projects } from "@serpio/database";
 import { eq, desc } from "drizzle-orm";
 import { log } from "../utils/logger";
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+import { ai, AI_MODEL } from "../lib/ai-client";
 
 export async function generateStyleGuide(projectId: string, jobId: string): Promise<void> {
   await log(jobId, "info", "Stil rehberi oluşturuluyor...");
@@ -26,8 +24,8 @@ export async function generateStyleGuide(projectId: string, jobId: string): Prom
 
   await log(jobId, "info", `${recentArticles.length} makale analiz ediliyor...`);
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
+  const response = await ai.chat.completions.create({
+    model: AI_MODEL,
     messages: [
       {
         role: "system",
@@ -53,7 +51,7 @@ Yanıtını SADECE JSON formatında ver, başka hiçbir şey yazma:
   });
 
   const content = response.choices[0]?.message?.content;
-  if (!content) throw new Error("GPT-4 yanıt vermedi");
+  if (!content) throw new Error("AI yanıt vermedi");
 
   const styleGuide = JSON.parse(content.replace(/```json\n?|\n?```/g, "").trim());
   styleGuide.generatedAt = new Date().toISOString();

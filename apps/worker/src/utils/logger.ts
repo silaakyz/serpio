@@ -2,7 +2,7 @@ import Redis from "ioredis";
 import { db } from "../lib/db";
 import { jobLogs } from "@serpio/database";
 
-const redis = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379");
+const redis = new Redis(process.env.REDIS_URL ?? "redis://127.0.0.1:6380");
 
 export type LogLevel = "info" | "success" | "warning" | "error" | "debug";
 

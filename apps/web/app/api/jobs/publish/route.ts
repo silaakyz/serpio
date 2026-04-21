@@ -14,7 +14,7 @@ interface PublishJobPayload {
   jobDbId?: string;
 }
 
-const _redis = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379", {
+const _redis = new Redis(process.env.REDIS_URL ?? "redis://127.0.0.1:6380", {
   maxRetriesPerRequest: null,
 });
 const publishQueue = new Queue<PublishJobPayload>("publish", { connection: _redis });

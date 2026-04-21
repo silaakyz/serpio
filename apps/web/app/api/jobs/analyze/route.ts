@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { rateLimit } from "@/lib/rate-limit";
 import { db } from "@serpio/database";
 import { jobs, projects } from "@serpio/database";
 import { eq } from "drizzle-orm";
@@ -16,10 +17,18 @@ interface AiJobPayload {
   jobDbId?: string;
 }
 
-const _redis = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379", {
+const _redis = new Redis(process.env.REDIS_URL ?? "redis://127.0.0.1:6380", {
   maxRetriesPerRequest: null,
 });
-const aiQueue = new Queue<AiJobPayload>("ai", { connection: _redis });
+const aiQueue = new Queue<AiJobPayload>("ai", {
+  connection: _redis,
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: "exponential", delay: 5000 },
+    removeOnComplete: { count: 100, age: 86400 },
+    removeOnFail: false,
+  },
+});
 
 const JOB_TYPE_MAP: Record<AiJobType, "style_guide" | "ai_analyze" | "ai_rewrite"> = {
   style_guide: "style_guide",
@@ -36,6 +45,11 @@ const CREDIT_COST: Record<AiJobType, number> = {
 };
 
 export async function POST(req: NextRequest) {
+  const { success } = rateLimit(req, 20, 60_000);
+  if (!success) {
+    return NextResponse.json({ error: "Çok fazla istek. Lütfen bekleyin." }, { status: 429 });
+  }
+
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

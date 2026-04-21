@@ -69,6 +69,8 @@ export class UniversalScraper {
         "--disable-gpu",
         "--no-first-run",
         "--no-zygote",
+        "--disable-extensions",
+        "--js-flags=--max-old-space-size=512",
       ],
     });
   }
@@ -336,17 +338,23 @@ export class UniversalScraper {
   private async extractArticle(url: string): Promise<ScrapedArticle | null> {
     if (!this.browser) throw new Error("Browser başlatılmadı");
 
-    const page = await this.browser.newPage();
+    const context = await this.browser.newContext({
+      javaScriptEnabled: true,
+      ignoreHTTPSErrors: true,
+      userAgent:
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      extraHTTPHeaders: { "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7" },
+    });
+    const page = await context.newPage();
 
     try {
-      await page.setExtraHTTPHeaders({
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-          "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
-      });
-
-      await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+      // networkidle başarısız olursa domcontentloaded'a fall back
+      try {
+        await page.goto(url, { waitUntil: "networkidle", timeout: 20_000 });
+      } catch {
+        await page.goto(url, { waitUntil: "domcontentloaded", timeout: 15_000 });
+      }
       await this.autoScroll(page);
 
       const html = await page.content();
@@ -400,11 +408,14 @@ export class UniversalScraper {
       return null;
     } finally {
       await page.close();
+      await context.close();
     }
   }
 
   // SPA ve lazy-load içerikler için otomatik scroll
   private async autoScroll(page: Page) {
+    // Max 10 saniye scroll — sonsuz SPA'ları bloke etme
+    const deadline = Date.now() + 10_000;
     await page.evaluate(async () => {
       await new Promise<void>((resolve) => {
         let totalHeight = 0;
@@ -412,14 +423,18 @@ export class UniversalScraper {
         const timer = setInterval(() => {
           window.scrollBy(0, distance);
           totalHeight += distance;
-          if (totalHeight >= document.body.scrollHeight || totalHeight > 12000) {
+          if (totalHeight >= document.body.scrollHeight || totalHeight > 15_000) {
             clearInterval(timer);
             resolve();
           }
-        }, 80);
+        }, 100);
+        // Güvenlik kilidi: 9 saniye sonra zorla durdur
+        setTimeout(() => { clearInterval(timer); resolve(); }, 9_000);
       });
-    });
-    await page.waitForTimeout(800);
+    }).catch(() => undefined);
+    // Kalan sürede kısa bir bekleme
+    const remaining = deadline - Date.now();
+    if (remaining > 200) await page.waitForTimeout(Math.min(remaining, 800));
   }
 
   // ─── Tarih Çıkarma ────────────────────────────────────────────────────────

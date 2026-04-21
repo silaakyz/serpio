@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -68,8 +68,9 @@ const navGroups: NavGroup[] = [
   {
     title: "AYARLAR",
     items: [
-      { href: "/dashboard/settings", label: "Proje Ayarları", icon: "⚙️" },
-      { href: "/dashboard/notifications", label: "Bildirimler", icon: "🔔", soon: true },
+      { href: "/dashboard/credits",       label: "Krediler",       icon: "💎" },
+      { href: "/dashboard/settings",      label: "Proje Ayarları", icon: "⚙️" },
+      { href: "/dashboard/notifications", label: "Bildirimler",    icon: "🔔", soon: true },
     ],
   },
 ];
@@ -79,11 +80,36 @@ interface SidebarProps {
   onClose: () => void;
 }
 
+// Plan bazlı maksimum kredi
+const PLAN_MAX = 500; // starter plan
+
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { data: session } = useSession();
-  const credits = (session?.user as { credits?: number })?.credits ?? 100;
-  const creditPercent = Math.min(100, (credits / 100) * 100);
+  const sessionCredits = (session?.user as { credits?: number })?.credits ?? 0;
+  const isAdmin = (session?.user as { role?: string })?.role === "admin";
+  const [credits, setCredits] = useState<number>(sessionCredits);
+
+  // Her 30 saniyede bir güncel bakiyeyi çek
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchBalance() {
+      try {
+        const res = await fetch("/api/credits/balance");
+        if (res.ok) {
+          const { credits: c } = await res.json();
+          if (!cancelled) setCredits(c);
+        }
+      } catch { /* sessiz geç */ }
+    }
+    fetchBalance();
+    const interval = setInterval(fetchBalance, 30_000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, []);
+
+  const creditPercent = Math.min(100, Math.max(0, (credits / PLAN_MAX) * 100));
+  const isLow      = credits < PLAN_MAX * 0.2;  // <20% → sarı
+  const isCritical = credits <= 10;             // ≤10 → kırmızı
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return pathname === "/dashboard";
@@ -174,23 +200,62 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           ))}
         </nav>
 
+        {/* Admin Panel Linki — sadece admin rolü */}
+        {isAdmin && (
+          <div className="px-3 pb-2">
+            <Link
+              href="/admin"
+              onClick={onClose}
+              className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all duration-150 font-ui"
+              style={{
+                backgroundColor: "rgba(255,68,68,0.08)",
+                border:          "1px solid rgba(255,68,68,0.25)",
+                color:           "#FF4444",
+              }}
+            >
+              <span>⚡</span>
+              <span>Admin Panel</span>
+            </Link>
+          </div>
+        )}
+
         {/* Alt Alan */}
         <div className="border-t border-border p-4 space-y-3">
           {/* Kredi Göstergesi */}
           <div className="space-y-1.5">
+            {isCritical && (
+              <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-ui"
+                   style={{ backgroundColor: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", color: "#FF4444" }}>
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
+                Kredi azalıyor!
+              </div>
+            )}
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted font-ui">Kredi Bakiyesi</span>
-              <span className="text-text font-ui font-medium">{credits} / 100</span>
+              <span className={`font-ui font-semibold ${isCritical ? "text-red-400" : isLow ? "text-yellow-400" : "text-emerald"}`}>
+                {credits} / {PLAN_MAX}
+              </span>
             </div>
             <div className="w-full h-1.5 bg-elevated rounded-full overflow-hidden">
               <div
-                className="h-full bg-emerald rounded-full transition-all duration-500"
-                style={{ width: `${creditPercent}%` }}
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${creditPercent}%`,
+                  backgroundColor: isCritical ? "#FF4444" : isLow ? "#F59E0B" : "#00FF87",
+                }}
               />
             </div>
-            <button className="w-full text-xs py-1.5 px-3 rounded-lg border border-emerald/40 text-emerald hover:bg-emerald/10 transition-colors font-ui">
-              Kredi Satın Al
-            </button>
+            <Link
+              href="/dashboard/credits"
+              onClick={onClose}
+              className="w-full text-xs py-1.5 px-3 rounded-lg border text-center block transition-colors font-ui"
+              style={{
+                borderColor: isCritical ? "rgba(239,68,68,0.4)" : "rgba(0,255,135,0.4)",
+                color:       isCritical ? "#FF4444" : "#00FF87",
+              }}
+            >
+              {isCritical ? "⚠ Kredi Satın Al" : "💎 Kredileri Yönet"}
+            </Link>
           </div>
 
           {/* Kullanıcı */}

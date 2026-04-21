@@ -1,10 +1,8 @@
-import OpenAI from "openai";
 import { db } from "../lib/db";
 import { articles, projects } from "@serpio/database";
 import { eq } from "drizzle-orm";
 import { log } from "../utils/logger";
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+import { ai, AI_MODEL } from "../lib/ai-client";
 
 export interface RewriteResult {
   aiContent: string;
@@ -34,8 +32,8 @@ export async function rewriteArticle(
 
   await log(jobId, "info", `"${article.title}" yeniden yazılıyor...`);
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
+  const response = await ai.chat.completions.create({
+    model: AI_MODEL,
     messages: [
       {
         role: "system",
@@ -66,7 +64,7 @@ KURALLAR:
   });
 
   const rawContent = response.choices[0]?.message?.content;
-  if (!rawContent) throw new Error("GPT-4 yanıt vermedi");
+  if (!rawContent) throw new Error("AI yanıt vermedi");
 
   const result = JSON.parse(rawContent.replace(/```json\n?|\n?```/g, "").trim());
 
