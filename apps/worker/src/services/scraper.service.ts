@@ -30,7 +30,7 @@ export interface ScrapeOptions {
 }
 
 // Taranmaması gereken URL kalıpları
-const SKIP_PATTERNS = [
+export const SKIP_PATTERNS = [
   /\.(pdf|jpg|jpeg|png|gif|svg|webp|ico|css|js|woff|woff2|ttf|eot|zip|gz|tar|mp4|mp3|avi)(\?.*)?$/i,
   /\/tag\//i,
   /\/tags\//i,

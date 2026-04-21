@@ -1,0 +1,7 @@
+apps/worker
+packages/database/drizzle
+**/.env*
+**/*.test.ts
+**/*.spec.ts
+**/node_modules
+**/.next/cache
