@@ -379,6 +379,85 @@ export const subscriptions = pgTable(
   })
 );
 
+// ─── Site Audit Enums ────────────────────────────────────────────────────────
+
+export const auditSeverityEnum = pgEnum("audit_severity", [
+  "critical",
+  "warning",
+  "info",
+]);
+
+export const auditIssueTypeEnum = pgEnum("audit_issue_type", [
+  "broken_link_internal",
+  "broken_link_external",
+  "missing_title",
+  "title_too_long",
+  "title_too_short",
+  "missing_meta_desc",
+  "meta_desc_too_long",
+  "meta_desc_too_short",
+  "missing_canonical",
+  "missing_viewport",
+  "missing_alt_text",
+  "slow_page",
+  "poor_lcp",
+  "poor_cls",
+  "duplicate_title",
+  "duplicate_meta_desc",
+  "missing_h1",
+  "multiple_h1",
+  "broken_heading_hierarchy",
+  "http_error",
+  "redirect_chain",
+  "missing_https",
+  "robots_blocked",
+]);
+
+// ─── Site Audit Sorunları ─────────────────────────────────────────────────────
+
+export const siteAuditIssues = pgTable(
+  "site_audit_issues",
+  {
+    id:         text("id").primaryKey().$defaultFn(() => createId()),
+    projectId:  text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+    articleId:  text("article_id").references(() => articles.id, { onDelete: "cascade" }),
+    pageUrl:    text("page_url").notNull(),
+    issueType:  auditIssueTypeEnum("issue_type").notNull(),
+    severity:   auditSeverityEnum("severity").notNull(),
+    details:    json("details").$type<Record<string, unknown>>(),
+    detectedAt: timestamp("detected_at", { mode: "date" }).notNull().defaultNow(),
+    resolvedAt: timestamp("resolved_at", { mode: "date" }),
+  },
+  (table) => ({
+    projectSeverityIdx: index("audit_project_severity_idx").on(table.projectId, table.severity),
+    articleIdx:         index("audit_article_idx").on(table.articleId),
+    resolvedIdx:        index("audit_resolved_idx").on(table.resolvedAt),
+    pageUrlIdx:         index("audit_page_url_idx").on(table.pageUrl),
+  })
+);
+
+// ─── Site Audit Snapshot ──────────────────────────────────────────────────────
+
+export const siteAuditSnapshots = pgTable(
+  "site_audit_snapshots",
+  {
+    id:            text("id").primaryKey().$defaultFn(() => createId()),
+    projectId:     text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+    healthScore:   integer("health_score").notNull(),
+    totalIssues:   integer("total_issues").notNull(),
+    criticalCount: integer("critical_count").notNull(),
+    warningCount:  integer("warning_count").notNull(),
+    infoCount:     integer("info_count").notNull(),
+    pagesAudited:  integer("pages_audited").notNull(),
+    avgLoadTime:   real("avg_load_time"),
+    createdAt:     timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    projectIdx:   index("audit_snapshots_project_idx").on(table.projectId),
+    createdAtIdx: index("audit_snapshots_created_at_idx").on(table.createdAt),
+  })
+);
+
 // ─── Google Bağlantısı ────────────────────────────────────────────────────────
 
 export const googleConnections = pgTable(
@@ -465,5 +544,7 @@ export type ExternalLinkSource = typeof externalLinkSources.$inferSelect;
 export type CreditTransaction  = typeof creditTransactions.$inferSelect;
 export type Subscription       = typeof subscriptions.$inferSelect;
 export type GoogleConnection   = typeof googleConnections.$inferSelect;
+export type SiteAuditIssue     = typeof siteAuditIssues.$inferSelect;
+export type SiteAuditSnapshot  = typeof siteAuditSnapshots.$inferSelect;
 export type GscMetric          = typeof gscMetrics.$inferSelect;
 export type GaMetric           = typeof gaMetrics.$inferSelect;

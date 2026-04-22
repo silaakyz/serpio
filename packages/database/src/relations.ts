@@ -13,6 +13,8 @@ import {
   googleConnections,
   gscMetrics,
   gaMetrics,
+  siteAuditIssues,
+  siteAuditSnapshots,
 } from "./schema";
 
 export const usersRelations = relations(users, ({ many, one }) => ({
@@ -43,13 +45,16 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   googleConnection:    one(googleConnections, { fields: [projects.id], references: [googleConnections.projectId] }),
   gscMetrics:          many(gscMetrics),
   gaMetrics:           many(gaMetrics),
+  siteAuditIssues:     many(siteAuditIssues),
+  siteAuditSnapshots:  many(siteAuditSnapshots),
 }));
 
 export const articlesRelations = relations(articles, ({ one, many }) => ({
-  project:    one(projects, { fields: [articles.projectId], references: [projects.id] }),
-  jobs:       many(jobs),
-  gscMetrics: many(gscMetrics),
-  gaMetrics:  many(gaMetrics),
+  project:         one(projects, { fields: [articles.projectId], references: [projects.id] }),
+  jobs:            many(jobs),
+  gscMetrics:      many(gscMetrics),
+  gaMetrics:       many(gaMetrics),
+  siteAuditIssues: many(siteAuditIssues),
 }));
 
 export const externalLinkSourcesRelations = relations(externalLinkSources, ({ one }) => ({
@@ -93,4 +98,13 @@ export const gscMetricsRelations = relations(gscMetrics, ({ one }) => ({
 export const gaMetricsRelations = relations(gaMetrics, ({ one }) => ({
   article: one(articles, { fields: [gaMetrics.articleId], references: [articles.id] }),
   project: one(projects, { fields: [gaMetrics.projectId], references: [projects.id] }),
+}));
+
+export const siteAuditIssuesRelations = relations(siteAuditIssues, ({ one }) => ({
+  project: one(projects, { fields: [siteAuditIssues.projectId], references: [projects.id] }),
+  article: one(articles, { fields: [siteAuditIssues.articleId], references: [articles.id] }),
+}));
+
+export const siteAuditSnapshotsRelations = relations(siteAuditSnapshots, ({ one }) => ({
+  project: one(projects, { fields: [siteAuditSnapshots.projectId], references: [projects.id] }),
 }));

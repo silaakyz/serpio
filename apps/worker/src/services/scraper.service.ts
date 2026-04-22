@@ -19,6 +19,8 @@ export interface ScrapedArticle {
   author: string | null;
   wordCount: number;
   language: string | null;
+  html: string;       // Raw HTML — audit için
+  loadTime: number;   // ms — sayfa yükleme süresi
 }
 
 export interface ScrapeOptions {
@@ -349,6 +351,7 @@ export class UniversalScraper {
     const page = await context.newPage();
 
     try {
+      const pageStart = Date.now();
       // networkidle başarısız olursa domcontentloaded'a fall back
       try {
         await page.goto(url, { waitUntil: "networkidle", timeout: 20_000 });
@@ -356,6 +359,7 @@ export class UniversalScraper {
         await page.goto(url, { waitUntil: "domcontentloaded", timeout: 15_000 });
       }
       await this.autoScroll(page);
+      const loadTime = Date.now() - pageStart;
 
       const html = await page.content();
       const $ = cheerio.load(html);
@@ -403,6 +407,8 @@ export class UniversalScraper {
         author,
         wordCount: article.textContent.split(/\s+/).filter(Boolean).length,
         language,
+        html,
+        loadTime,
       };
     } catch {
       return null;

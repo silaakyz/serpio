@@ -1,9 +1,10 @@
 import { Worker, Job } from "bullmq";
 import Redis from "ioredis";
 import { db } from "../lib/db";
-import { articles, jobs } from "@serpio/database";
+import { articles, jobs, siteAuditIssues, siteAuditSnapshots } from "@serpio/database";
 import { eq } from "drizzle-orm";
 import { UniversalScraper } from "../services/scraper.service";
+import { auditHtml, calculateProjectHealthScore, PageAuditResult } from "../services/audit-analyzer.service";
 import { log } from "../utils/logger";
 import { consumeCredits, refundCredits } from "../utils/credit";
 
@@ -15,7 +16,7 @@ interface ScrapeJobData {
   projectId: string;
   userId: string;
   url: string;
-  jobDbId: string; // jobs tablosundaki id
+  jobDbId: string;
   maxDepth?: number;
   maxPages?: number;
 }
@@ -23,11 +24,9 @@ interface ScrapeJobData {
 const scrapeWorker = new Worker<ScrapeJobData>(
   "scrape",
   async (job: Job<ScrapeJobData>) => {
-
     const { projectId, userId, url, jobDbId, maxDepth, maxPages } = job.data;
-    const jobId = jobDbId; // log için jobs tablosundaki id'yi kullan
+    const jobId = jobDbId;
 
-    // İş durumunu "active" yap
     await db.update(jobs)
       .set({ status: "active", startedAt: new Date(), progress: 0 })
       .where(eq(jobs.id, jobId))
@@ -38,7 +37,6 @@ const scrapeWorker = new Worker<ScrapeJobData>(
     try {
       await log(jobId, "info", `Scraping başlatılıyor → ${url}`);
 
-      // Kredi kontrolü ve tüketimi
       const credited = await consumeCredits(userId, creditCost, `Scraping: ${url}`, jobId);
       if (!credited) {
         await log(jobId, "error", "Yetersiz kredi! İşlem iptal edildi.");
@@ -46,72 +44,135 @@ const scrapeWorker = new Worker<ScrapeJobData>(
       }
       await log(jobId, "success", `${creditCost} kredi kullanıldı`);
 
-      // Scraper başlat
       const scraper = new UniversalScraper();
       await scraper.initialize();
       await log(jobId, "info", "Chromium tarayıcısı başlatıldı");
-
-      // robots.txt kontrolü
       await log(jobId, "info", "robots.txt kontrol ediliyor...");
 
-      // Scrape et
       const scrapedArticles = await scraper.scrape(
         url,
         {
-          maxDepth: maxDepth ?? 2,
-          maxPages: maxPages ?? 100,
+          maxDepth:    maxDepth ?? 2,
+          maxPages:    maxPages ?? 100,
           concurrency: 3,
-          delay: 1200,
+          delay:       1200,
         },
         async (current, total, pageUrl) => {
           const shortUrl = (() => {
             try { return new URL(pageUrl).pathname; } catch { return pageUrl; }
           })();
           await log(jobId, "success", `[${current}/${total}] Çekildi → ${shortUrl}`);
-          await job.updateProgress(Math.round((current / total) * 90));
+          await job.updateProgress(Math.round((current / total) * 85));
         }
       );
 
       await scraper.close();
       await log(jobId, "info", `Tarama tamamlandı — ${scrapedArticles.length} sayfa işlendi`);
 
-      // Makaleleri DB'ye kaydet
-      let savedCount = 0;
+      // ─── Makaleleri kaydet ────────────────────────────────────────────────
+      let savedCount   = 0;
       let skippedCount = 0;
+      const savedArticleMap = new Map<string, string>(); // url → articleId
 
       for (const article of scrapedArticles) {
-        // Aynı URL zaten varsa atla
         const existing = await db.query.articles.findFirst({
           where: eq(articles.originalUrl, article.url),
+          columns: { id: true },
         }).catch(() => null);
 
         if (existing) {
+          savedArticleMap.set(article.url, existing.id);
           skippedCount++;
           continue;
         }
 
         const staleStatus = calcStaleStatus(article.lastModifiedAt ?? article.publishedAt);
 
-        await db.insert(articles).values({
+        const [saved] = await db.insert(articles).values({
           projectId,
-          title: article.title || "Başlıksız",
+          title:           article.title || "Başlıksız",
           originalContent: article.content || article.textContent,
-          originalUrl: article.url,
-          slug: article.slug || null,
-          excerpt: article.excerpt || null,
+          originalUrl:     article.url,
+          slug:            article.slug || null,
+          excerpt:         article.excerpt || null,
           originalPublishedAt: article.publishedAt,
-          lastModifiedAt: article.lastModifiedAt,
+          lastModifiedAt:      article.lastModifiedAt,
           staleStatus,
           status: "scraped",
-        }).catch(() => { skippedCount++; });
+        }).returning({ id: articles.id }).catch(() => []);
 
-        savedCount++;
+        if (saved) {
+          savedArticleMap.set(article.url, saved.id);
+          savedCount++;
+        } else {
+          skippedCount++;
+        }
       }
 
       await log(jobId, "success", `${savedCount} yeni makale kaydedildi`);
       if (skippedCount > 0) {
         await log(jobId, "info", `${skippedCount} makale atlandı (zaten mevcut veya hata)`);
       }
+
+      // ─── Teknik SEO Audit ─────────────────────────────────────────────────
+      await log(jobId, "info", "Teknik SEO analizi yapılıyor...");
+
+      const allTitles       = new Set<string>();
+      const allDescriptions = new Set<string>();
+      const auditResults: PageAuditResult[] = [];
+
+      for (const article of scrapedArticles) {
+        if (!article.html) continue;
+        const result = auditHtml(
+          article.html,
+          article.url,
+          article.loadTime ?? 0,
+          allTitles,
+          allDescriptions
+        );
+        auditResults.push(result);
+      }
+
+      // Audit sorunlarını DB'ye kaydet
+      for (const result of auditResults) {
+        const articleId = savedArticleMap.get(result.url) ?? null;
+        for (const issue of result.issues) {
+          await db.insert(siteAuditIssues).values({
+            projectId,
+            articleId,
+            pageUrl:   result.url,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            issueType: issue.issueType as any,
+            severity:  issue.severity,
+            details:   issue.details,
+          }).onConflictDoNothing().catch(() => undefined);
+        }
+      }
+
+      // Snapshot kaydet
+      const allIssues    = auditResults.flatMap((r) => r.issues);
+      const healthScore  = calculateProjectHealthScore(auditResults);
+      const avgLoadTime  = auditResults.length
+        ? auditResults.reduce((s, r) => s + r.loadTime, 0) / auditResults.length
+        : 0;
+
+      await db.insert(siteAuditSnapshots).values({
+        projectId,
+        healthScore,
+        totalIssues:   allIssues.length,
+        criticalCount: allIssues.filter((i) => i.severity === "critical").length,
+        warningCount:  allIssues.filter((i) => i.severity === "warning").length,
+        infoCount:     allIssues.filter((i) => i.severity === "info").length,
+        pagesAudited:  auditResults.length,
+        avgLoadTime:   Math.round(avgLoadTime),
+      }).catch(() => undefined);
+
+      await log(jobId, "success", `Site Sağlığı Skoru: ${healthScore}/100 ✓`);
+      await log(jobId, "info",
+        `${allIssues.filter((i) => i.severity === "critical").length} kritik, ` +
+        `${allIssues.filter((i) => i.severity === "warning").length} uyarı`
+      );
+
       await log(jobId, "success", "İşlem başarıyla tamamlandı ✨");
 
       await db.update(jobs)
@@ -119,7 +180,7 @@ const scrapeWorker = new Worker<ScrapeJobData>(
         .where(eq(jobs.id, jobId))
         .catch(() => undefined);
 
-      return { articlesFound: scrapedArticles.length, articlesSaved: savedCount };
+      return { articlesFound: scrapedArticles.length, articlesSaved: savedCount, healthScore };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       await log(jobId, "error", `Hata: ${message}`);
@@ -127,7 +188,6 @@ const scrapeWorker = new Worker<ScrapeJobData>(
         .set({ status: "failed", error: message })
         .where(eq(jobs.id, jobId))
         .catch(() => undefined);
-      // Yetersiz kredi hatası değilse → ödenen kredileri iade et
       if (message !== "Yetersiz kredi") {
         await refundCredits(userId, creditCost, `İade: scraping başarısız — ${url}`, jobId)
           .catch(() => undefined);

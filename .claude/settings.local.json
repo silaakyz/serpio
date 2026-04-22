@@ -47,7 +47,29 @@
       "Bash(pnpm db:generate)",
       "Bash(pnpm db:migrate)",
       "Bash(DATABASE_URL=\"postgresql://serpio:serpio_dev@localhost:5432/serpio_dev\" pnpm db:migrate)",
-      "Bash(pnpm --filter @serpio/worker add googleapis)"
+      "Bash(pnpm --filter @serpio/worker add googleapis)",
+      "Bash(curl -s http://localhost:3000/api/auth/session)",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' http://localhost:3004/dashboard/settings)",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' http://localhost:3004/dashboard/performance)",
+      "Bash(curl -s 'http://localhost:3004/api/google/auth?projectId=test')",
+      "Bash(curl -s -o /dev/null -w 'HTTP %{http_code} → %{redirect_url}' http://localhost:3004/api/google/callback)",
+      "Bash(curl -s -o /dev/null -w 'HTTP %{http_code} → %{redirect_url}' 'http://localhost:3004/api/google/callback?error=access_denied')",
+      "Bash(node -e \"require\\('dotenv'\\).config\\({path:'C:/Users/akyzs/serpio/.env'}\\); console.log\\('CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? 'SET \\('+process.env.GOOGLE_CLIENT_ID.slice\\(0,20\\)+'...\\)' : 'MISSING'\\)\")",
+      "Bash(curl -s -c /tmp/cookies.txt -b /tmp/cookies.txt -X POST http://localhost:3004/api/auth/callback/credentials -H 'Content-Type: application/x-www-form-urlencoded' --data-urlencode email=akyzsila0@gmail.com --data-urlencode password=akyzsila0 --data-urlencode csrfToken=a83e04024437a3b8976a9bcf732a8c7f7674ee80d887e8a6caa3c120bcc1c67f --data-urlencode json=true -o /dev/null -w 'HTTP %{http_code}')",
+      "Bash(curl -s -b /tmp/cookies.txt http://localhost:3004/api/auth/session)",
+      "Bash(node -e ' *)",
+      "Bash(curl -s 'http://localhost:3004/api/google/auth?projectId=xxx')",
+      "Bash(curl -s -L http://localhost:3004/dashboard/performance)",
+      "Bash(curl -s -L http://localhost:3004/dashboard/settings)",
+      "Bash(curl -s -o /dev/null -w 'HTTP %{http_code}' 'http://localhost:3004/api/google/callback?code=fake&state=proj123')",
+      "Bash(curl -s -o /dev/null -w 'HTTP %{http_code}' 'http://localhost:3004/api/google/callback?error=access_denied')",
+      "Bash(curl -s 'http://localhost:3004/api/google/sites?projectId=xxx')",
+      "Bash(curl -s -X DELETE 'http://localhost:3004/api/google/disconnect?projectId=xxx')",
+      "Bash(curl -s 'http://localhost:3004/api/google/properties?projectId=xxx')",
+      "Bash(pnpm --filter @serpio/worker build)",
+      "Bash(node *)",
+      "Bash(pkill -f \"next dev\")",
+      "Bash(DATABASE_URL=\"postgresql://serpio:serpio_dev@localhost:5432/serpio_dev\" pnpm db:generate)"
     ]
   }
 }
