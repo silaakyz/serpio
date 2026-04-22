@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  drizzle-orm: 0.36.4
+
 importers:
 
   .:
@@ -87,7 +90,7 @@ importers:
         specifier: ^9.0.0
         version: 9.0.0
       drizzle-orm:
-        specifier: ^0.36.4
+        specifier: 0.36.4
         version: 0.36.4(@opentelemetry/api@1.9.1)(@types/pg@8.15.6)(@types/react@18.3.28)(postgres@3.4.9)(react@18.3.1)
       ioredis:
         specifier: ^5.4.1
@@ -166,7 +169,7 @@ importers:
         specifier: ^17.4.2
         version: 17.4.2
       drizzle-orm:
-        specifier: ^0.36.4
+        specifier: 0.36.4
         version: 0.36.4(@opentelemetry/api@1.9.1)(@types/pg@8.15.6)(@types/react@18.3.28)(postgres@3.4.9)(react@18.3.1)
       ioredis:
         specifier: ^5.4.1
@@ -174,6 +177,9 @@ importers:
       jsdom:
         specifier: ^29.0.2
         version: 29.0.2(@noble/hashes@1.8.0)
+      node-html-parser:
+        specifier: ^7.1.0
+        version: 7.1.0
       openai:
         specifier: ^6.34.0
         version: 6.34.0
@@ -232,12 +238,15 @@ importers:
         specifier: ^2.3.1
         version: 2.3.1
       drizzle-orm:
-        specifier: ^0.36.4
+        specifier: 0.36.4
         version: 0.36.4(@opentelemetry/api@1.9.1)(@types/pg@8.15.6)(@types/react@18.3.28)(postgres@3.4.9)(react@18.3.1)
       postgres:
         specifier: ^3.4.9
         version: 3.4.9
     devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.17
       drizzle-kit:
         specifier: ^0.28.1
         version: 0.28.1
@@ -2632,6 +2641,10 @@ packages:
     resolution: {integrity: sha512-0hJU9SCPvmMzIBdZFqNPXWa6dqh7WdH0cII9y+CyS8rG3nL48Bclra9HmKhVVUHyPWNH5Y7xDwAB7bfgSjkUMQ==}
     engines: {node: '>= 0.4'}
 
+  he@1.2.0:
+    resolution: {integrity: sha512-F/1DnUGPopORZi0ni+CvrCgHQ5FyEAHRLSApuYWMmrbSwoN2Mn/7k+Gl38gJnR7yyDZk6WLXwiGod1JOWNDKGw==}
+    hasBin: true
+
   html-encoding-sniffer@6.0.0:
     resolution: {integrity: sha512-CV9TW3Y3f8/wT0BRFc1/KAVQ3TUHiXmaAb6VW9vtiMFf7SLoMd1PdAc4W3KFOFETBJUb90KatHqlsZMWV+R9Gg==}
     engines: {node: ^20.19.0 || ^22.12.0 || >=24.0.0}
@@ -2955,6 +2968,9 @@ packages:
   node-gyp-build-optional-packages@5.2.2:
     resolution: {integrity: sha512-s+w+rBWnpTMwSFbaE0UXsRlg7hU4FjekKU4eyAih5T8nJuNZT1nNsskXpxmeqSK9UzkBl6UgRlnKc8hz8IEqOw==}
     hasBin: true
+
+  node-html-parser@7.1.0:
+    resolution: {integrity: sha512-iJo8b2uYGT40Y8BTyy5ufL6IVbN8rbm/1QK2xffXU/1a/v3AAa0d1YAoqBNYqaS4R/HajkWIpIfdE6KcyFh1AQ==}
 
   node-releases@2.0.37:
     resolution: {integrity: sha512-1h5gKZCF+pO/o3Iqt5Jp7wc9rH3eJJ0+nh/CIoiRwjRxde/hAHyLPXYN4V3CqKAbiZPSeJFSWHmJsbkicta0Eg==}
@@ -5896,6 +5912,8 @@ snapshots:
     dependencies:
       function-bind: 1.1.2
 
+  he@1.2.0: {}
+
   html-encoding-sniffer@6.0.0(@noble/hashes@1.8.0):
     dependencies:
       '@exodus/bytes': 1.15.0(@noble/hashes@1.8.0)
@@ -6201,6 +6219,11 @@ snapshots:
     dependencies:
       detect-libc: 2.1.2
     optional: true
+
+  node-html-parser@7.1.0:
+    dependencies:
+      css-select: 5.2.2
+      he: 1.2.0
 
   node-releases@2.0.37: {}
 

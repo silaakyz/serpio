@@ -12,6 +12,11 @@
     "db:migrate": "turbo run db:migrate",
     "db:studio": "turbo run db:studio"
   },
+  "pnpm": {
+    "overrides": {
+      "drizzle-orm": "0.36.4"
+    }
+  },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

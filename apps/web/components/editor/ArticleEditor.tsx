@@ -64,14 +64,17 @@ interface Props { article: Article }
 type ViewMode = "split" | "diff";
 type ActiveTab = "original" | "ai";
 type SaveStatus = "idle" | "saving" | "saved" | "autosaved";
+type BottomTab = "meta" | "geo" | "faq" | "schema";
 
 export function ArticleEditor({ article }: Props) {
   const router = useRouter();
-  const [viewMode, setViewMode]   = useState<ViewMode>("split");
-  const [activeTab, setActiveTab] = useState<ActiveTab>("ai");
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
-  const [rewriting, setRewriting]   = useState(false);
-  const [publishing, setPublishing] = useState(false);
+  const [viewMode, setViewMode]       = useState<ViewMode>("split");
+  const [activeTab, setActiveTab]     = useState<ActiveTab>("ai");
+  const [bottomTab, setBottomTab]     = useState<BottomTab>("meta");
+  const [saveStatus, setSaveStatus]   = useState<SaveStatus>("idle");
+  const [rewriting, setRewriting]     = useState(false);
+  const [publishing, setPublishing]   = useState(false);
+  const [geoLoading, setGeoLoading]   = useState<"analyze" | "optimize" | null>(null);
   const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Restore draft from localStorage ────────────────────────────────────────
@@ -190,14 +193,47 @@ export function ArticleEditor({ article }: Props) {
     }
   }, [article.id, article.projectId, router]);
 
+  // ── GEO Job ──────────────────────────────────────────────────────────────────
+  const handleGeoJob = useCallback(async (type: "geo_analyze" | "geo_optimize") => {
+    setGeoLoading(type === "geo_analyze" ? "analyze" : "optimize");
+    const label = type === "geo_analyze" ? "GEO Analiz" : "GEO Optimize";
+    const tid = toast.loading(`${label} başlatılıyor...`);
+    try {
+      const res = await fetch("/api/jobs/geo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: article.projectId, articleId: article.id, type }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Job tetikleme hatası");
+      const data = await res.json();
+      toast.success(`${label} kuyruğa eklendi ✓`, { id: tid });
+      router.push(`/dashboard/terminal?jobId=${data.jobId}`);
+    } catch (err) {
+      toast.error(`Hata: ${err instanceof Error ? err.message : "Bilinmeyen hata"}`, { id: tid });
+    } finally {
+      setGeoLoading(null);
+    }
+  }, [article.id, article.projectId, router]);
+
   // ── Stats ────────────────────────────────────────────────────────────────────
   const origWords = wordCount(article.originalContent);
   const aiWords   = editor ? wordCount(editor.getHTML()) : wordCount(article.aiContent ?? "");
   const hasAiContent = !!article.aiContent;
 
-  const internalLinks = (article.internalLinks as { text: string; url: string; keyword: string }[]) ?? [];
-  const externalLinks = (article.externalLinks as { text: string; url: string; keyword: string }[]) ?? [];
-  const aiKeywords    = (article.aiKeywords as string[]) ?? [];
+  const internalLinks  = (article.internalLinks as { text: string; url: string; keyword: string }[]) ?? [];
+  const externalLinks  = (article.externalLinks as { text: string; url: string; keyword: string }[]) ?? [];
+  const aiKeywords     = (article.aiKeywords as string[]) ?? [];
+  const geoScore       = article.geoScore ?? null;
+  const geoSuggestions = (article.geoSuggestions as string[] | null) ?? [];
+  const faqContent     = (article.faqContent as { q: string; a: string }[] | null) ?? [];
+  const schemaMarkup   = article.schemaMarkup as Record<string, unknown> | null;
+
+  function geoTextColor(score: number | null) {
+    if (score === null) return "text-muted";
+    if (score >= 70) return "text-emerald";
+    if (score >= 40) return "text-yellow-400";
+    return "text-red-400";
+  }
 
   // ── Save status label ────────────────────────────────────────────────────────
   const saveLabel = {
@@ -371,91 +407,245 @@ export function ArticleEditor({ article }: Props) {
         </>
       )}
 
-      {/* Meta & Keywords */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-surface border border-border rounded-xl p-4 space-y-3">
-          <h3 className="text-sm font-ui font-semibold text-text">Başlık & Meta</h3>
-          <div className="space-y-2">
-            <div>
-              <p className="text-xs text-muted font-ui uppercase tracking-wider mb-1">Orijinal Başlık</p>
-              <p className="text-sm text-text/70 font-ui">{article.title}</p>
-            </div>
-            {article.aiTitle && (
-              <div>
-                <p className="text-xs text-muted font-ui uppercase tracking-wider mb-1">AI Başlık</p>
-                <p className="text-sm text-emerald font-ui">{article.aiTitle}</p>
-              </div>
-            )}
-            {article.aiMetaDesc && (
-              <div>
-                <p className="text-xs text-muted font-ui uppercase tracking-wider mb-1">
-                  Meta Açıklama ({article.aiMetaDesc.length}/155)
-                </p>
-                <p className="text-xs text-text/70 font-ui leading-relaxed">{article.aiMetaDesc}</p>
-              </div>
-            )}
-          </div>
+      {/* Bottom Tabs */}
+      <div className="bg-surface border border-border rounded-xl overflow-hidden">
+        {/* Tab bar */}
+        <div className="flex border-b border-border bg-elevated/50">
+          {(["meta", "geo", "faq", "schema"] as BottomTab[]).map((tab) => {
+            const labels: Record<BottomTab, string> = {
+              meta: "Meta & Linkler",
+              geo: geoScore !== null ? `GEO (${geoScore}/100)` : "GEO Analiz",
+              faq: `FAQ ${faqContent.length > 0 ? `(${faqContent.length})` : ""}`,
+              schema: "Schema",
+            };
+            return (
+              <button
+                key={tab}
+                onClick={() => setBottomTab(tab)}
+                className={`px-4 py-3 text-xs font-ui font-medium transition-colors ${
+                  bottomTab === tab
+                    ? "text-text border-b-2 border-emerald"
+                    : "text-muted hover:text-text"
+                }`}
+              >
+                {labels[tab]}
+              </button>
+            );
+          })}
         </div>
 
-        <div className="bg-surface border border-border rounded-xl p-4 space-y-3">
-          <h3 className="text-sm font-ui font-semibold text-text">Anahtar Kelimeler</h3>
-          {aiKeywords.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {aiKeywords.map((kw) => (
-                <span key={kw} className="text-xs bg-tech-blue/10 text-tech-blue border border-tech-blue/30 px-2 py-1 rounded-full font-ui">
-                  {kw}
-                </span>
-              ))}
+        <div className="p-4">
+          {/* Meta & Linkler */}
+          {bottomTab === "meta" && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <h3 className="text-sm font-ui font-semibold text-text">Başlık & Meta</h3>
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-xs text-muted font-ui uppercase tracking-wider mb-1">Orijinal Başlık</p>
+                    <p className="text-sm text-text/70 font-ui">{article.title}</p>
+                  </div>
+                  {article.aiTitle && (
+                    <div>
+                      <p className="text-xs text-muted font-ui uppercase tracking-wider mb-1">AI Başlık</p>
+                      <p className="text-sm text-emerald font-ui">{article.aiTitle}</p>
+                    </div>
+                  )}
+                  {article.aiMetaDesc && (
+                    <div>
+                      <p className="text-xs text-muted font-ui uppercase tracking-wider mb-1">
+                        Meta Açıklama ({article.aiMetaDesc.length}/155)
+                      </p>
+                      <p className="text-xs text-text/70 font-ui leading-relaxed">{article.aiMetaDesc}</p>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-sm font-ui font-semibold text-text mb-2">Anahtar Kelimeler</h3>
+                  {aiKeywords.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {aiKeywords.map((kw) => (
+                        <span key={kw} className="text-xs bg-tech-blue/10 text-tech-blue border border-tech-blue/30 px-2 py-1 rounded-full font-ui">
+                          {kw}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted font-ui">Henüz anahtar kelime yok.</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {internalLinks.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-ui font-semibold text-text mb-2">
+                      İç Link Önerileri <span className="text-xs text-muted font-normal">({internalLinks.length})</span>
+                    </h3>
+                    <ul className="space-y-2">
+                      {internalLinks.slice(0, 5).map((link, i) => (
+                        <li key={i} className="flex items-start gap-2 text-xs font-ui">
+                          <span className="text-emerald mt-0.5">→</span>
+                          <div className="min-w-0">
+                            <span className="text-text">{link.text}</span>
+                            <a href={link.url} target="_blank" rel="noopener noreferrer"
+                               className="block text-tech-blue hover:underline truncate">{link.url}</a>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {externalLinks.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-ui font-semibold text-text mb-2">
+                      Dış Link Önerileri <span className="text-xs text-muted font-normal">({externalLinks.length})</span>
+                    </h3>
+                    <ul className="space-y-2">
+                      {externalLinks.slice(0, 5).map((link, i) => (
+                        <li key={i} className="flex items-start gap-2 text-xs font-ui">
+                          <span className="text-gold mt-0.5">↗</span>
+                          <div className="min-w-0">
+                            <span className="text-text">{link.text}</span>
+                            <a href={link.url} target="_blank" rel="noopener noreferrer"
+                               className="block text-tech-blue hover:underline truncate">{link.url}</a>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {internalLinks.length === 0 && externalLinks.length === 0 && (
+                  <p className="text-xs text-muted font-ui">Henüz link önerisi yok.</p>
+                )}
+              </div>
             </div>
-          ) : (
-            <p className="text-xs text-muted font-ui">Henüz anahtar kelime yok.</p>
+          )}
+
+          {/* GEO Skoru */}
+          {bottomTab === "geo" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="text-center">
+                    <p className={`text-4xl font-display font-bold ${geoTextColor(geoScore)}`}>
+                      {geoScore !== null ? geoScore : "—"}
+                    </p>
+                    <p className="text-xs text-muted font-ui">/ 100</p>
+                  </div>
+                  {geoScore !== null && (
+                    <div className="w-32 h-2 rounded-full bg-elevated overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${
+                          geoScore >= 70 ? "bg-emerald" : geoScore >= 40 ? "bg-yellow-400" : "bg-red-400"
+                        }`}
+                        style={{ width: `${geoScore}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleGeoJob("geo_analyze")}
+                    disabled={geoLoading !== null}
+                    className="px-3 py-2 rounded-lg border border-yellow-400/30 text-yellow-400 text-xs font-ui hover:bg-yellow-400/10 transition-colors disabled:opacity-40"
+                  >
+                    {geoLoading === "analyze" ? "Başlatılıyor..." : "GEO Analiz Et (2 kredi)"}
+                  </button>
+                  <button
+                    onClick={() => handleGeoJob("geo_optimize")}
+                    disabled={geoLoading !== null || !hasAiContent}
+                    title={!hasAiContent ? "Önce AI içerik oluşturun" : "FAQ + Schema Markup üret (5 kredi)"}
+                    className="px-3 py-2 rounded-lg border border-emerald/30 text-emerald text-xs font-ui hover:bg-emerald/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {geoLoading === "optimize" ? "Başlatılıyor..." : "GEO Optimize Et (5 kredi)"}
+                  </button>
+                </div>
+              </div>
+
+              {geoSuggestions.length > 0 ? (
+                <ul className="space-y-2">
+                  {geoSuggestions.map((s, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs font-ui bg-yellow-400/5 border border-yellow-400/15 rounded-lg px-3 py-2">
+                      <span className="text-yellow-400 mt-0.5 flex-shrink-0">⚠</span>
+                      <span className="text-text/80">{s}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : geoScore !== null ? (
+                <p className="text-xs text-emerald font-ui">GEO skoru iyi! Öneri bulunmuyor.</p>
+              ) : (
+                <p className="text-xs text-muted font-ui">
+                  GEO analizi henüz yapılmamış. "GEO Analiz Et" butonuna tıklayın.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* FAQ */}
+          {bottomTab === "faq" && (
+            <div className="space-y-3">
+              {faqContent.length > 0 ? (
+                <ul className="space-y-4">
+                  {faqContent.map((faq, i) => (
+                    <li key={i} className="border border-border/50 rounded-lg p-3 space-y-1">
+                      <p className="text-sm font-ui font-semibold text-text">{faq.q}</p>
+                      <p className="text-xs font-ui text-muted leading-relaxed">{faq.a}</p>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-muted text-sm font-ui">Henüz FAQ içeriği yok.</p>
+                  <button
+                    onClick={() => handleGeoJob("geo_optimize")}
+                    disabled={geoLoading !== null || !hasAiContent}
+                    className="mt-3 px-4 py-2 rounded-lg bg-emerald/10 border border-emerald/30 text-emerald text-xs font-ui hover:bg-emerald/20 transition-colors disabled:opacity-40"
+                  >
+                    GEO Optimize ile FAQ Üret (5 kredi)
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Schema */}
+          {bottomTab === "schema" && (
+            <div className="space-y-3">
+              {schemaMarkup ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted font-ui">JSON-LD Schema Markup</p>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(JSON.stringify(schemaMarkup, null, 2));
+                        toast.success("Schema kopyalandı ✓");
+                      }}
+                      className="text-xs text-tech-blue hover:underline font-ui"
+                    >
+                      Kopyala
+                    </button>
+                  </div>
+                  <pre className="bg-elevated rounded-lg p-3 text-xs font-mono text-text/80 overflow-auto max-h-[300px] whitespace-pre-wrap">
+                    {JSON.stringify(schemaMarkup, null, 2)}
+                  </pre>
+                </>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-muted text-sm font-ui">Henüz Schema Markup üretilmedi.</p>
+                  <button
+                    onClick={() => handleGeoJob("geo_optimize")}
+                    disabled={geoLoading !== null || !hasAiContent}
+                    className="mt-3 px-4 py-2 rounded-lg bg-tech-blue/10 border border-tech-blue/30 text-tech-blue text-xs font-ui hover:bg-tech-blue/20 transition-colors disabled:opacity-40"
+                  >
+                    GEO Optimize ile Schema Üret (5 kredi)
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
-
-      {/* Link Suggestions */}
-      {(internalLinks.length > 0 || externalLinks.length > 0) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {internalLinks.length > 0 && (
-            <div className="bg-surface border border-border rounded-xl p-4 space-y-3">
-              <h3 className="text-sm font-ui font-semibold text-text">
-                İç Link Önerileri <span className="text-xs text-muted font-normal">({internalLinks.length})</span>
-              </h3>
-              <ul className="space-y-2">
-                {internalLinks.map((link, i) => (
-                  <li key={i} className="flex items-start gap-2 text-xs font-ui">
-                    <span className="text-emerald mt-0.5">→</span>
-                    <div>
-                      <span className="text-text">{link.text}</span>
-                      <a href={link.url} target="_blank" rel="noopener noreferrer"
-                         className="block text-tech-blue hover:underline truncate max-w-xs">{link.url}</a>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {externalLinks.length > 0 && (
-            <div className="bg-surface border border-border rounded-xl p-4 space-y-3">
-              <h3 className="text-sm font-ui font-semibold text-text">
-                Dış Link Önerileri <span className="text-xs text-muted font-normal">({externalLinks.length})</span>
-              </h3>
-              <ul className="space-y-2">
-                {externalLinks.map((link, i) => (
-                  <li key={i} className="flex items-start gap-2 text-xs font-ui">
-                    <span className="text-gold mt-0.5">↗</span>
-                    <div>
-                      <span className="text-text">{link.text}</span>
-                      <a href={link.url} target="_blank" rel="noopener noreferrer"
-                         className="block text-tech-blue hover:underline truncate max-w-xs">{link.url}</a>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }

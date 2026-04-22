@@ -76,6 +76,7 @@ export function ArticlesTable({ articles, projectId, initialStatus, initialStale
   const [perPage, setPerPage] = useState(10);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [publishingId, setPublishingId] = useState<string | null>(null);
+  const [geoLoadingId, setGeoLoadingId] = useState<string | null>(null);
   const [confirmRewriteAll, setConfirmRewriteAll] = useState(false);
   const [styleGuideLoading, setStyleGuideLoading] = useState(false);
   const [rewriteAllLoading, setRewriteAllLoading] = useState(false);
@@ -164,6 +165,31 @@ export function ArticlesTable({ articles, projectId, initialStatus, initialStale
         toast.error(`Hata: ${err instanceof Error ? err.message : "Yayınlama başlatılamadı"}`, { id: tid });
       } finally {
         setPublishingId(null);
+      }
+    },
+    [projectId, router]
+  );
+
+  const triggerGeoJob = useCallback(
+    async (articleId: string, type: "geo_analyze" | "geo_optimize") => {
+      if (!projectId) return;
+      setGeoLoadingId(articleId + type);
+      const label = type === "geo_analyze" ? "GEO Analiz" : "GEO Optimize";
+      const tid = toast.loading(`${label} başlatılıyor...`);
+      try {
+        const res = await fetch("/api/jobs/geo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projectId, articleId, type }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "Job başlatılamadı");
+        toast.success(`${label} kuyruğa eklendi ✓`, { id: tid });
+        router.push(`/dashboard/terminal?jobId=${data.jobId}`);
+      } catch (err) {
+        toast.error(`Hata: ${err instanceof Error ? err.message : "Bilinmeyen hata"}`, { id: tid });
+      } finally {
+        setGeoLoadingId(null);
       }
     },
     [projectId, router]
@@ -350,9 +376,31 @@ export function ArticlesTable({ articles, projectId, initialStatus, initialStale
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs font-display font-bold ${geoColor(a.geoScore)}`}>
-                        {a.geoScore !== null ? a.geoScore : "—"}
-                      </span>
+                      {a.geoScore !== null ? (
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-14 h-1.5 rounded-full bg-elevated overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${
+                                a.geoScore >= 70 ? "bg-emerald" :
+                                a.geoScore >= 40 ? "bg-yellow-400" : "bg-red-400"
+                              }`}
+                              style={{ width: `${a.geoScore}%` }}
+                            />
+                          </div>
+                          <span className={`text-xs font-display font-bold ${geoColor(a.geoScore)}`}>
+                            {a.geoScore}
+                          </span>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); triggerGeoJob(a.id, "geo_analyze"); }}
+                          disabled={geoLoadingId !== null}
+                          title="GEO Analizi başlat (2 kredi)"
+                          className="text-xs text-muted hover:text-yellow-400 transition-colors disabled:opacity-40"
+                        >
+                          Analiz et →
+                        </button>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-xs text-muted whitespace-nowrap">
                       {fmtDate(a.lastModifiedAt ?? a.originalPublishedAt ?? a.createdAt)}
