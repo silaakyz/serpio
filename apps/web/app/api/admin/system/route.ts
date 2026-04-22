@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminResponse } from "@/lib/admin-guard";
 import { db } from "@serpio/database";
-import { sql } from "drizzle-orm";
+import { sql } from "@serpio/database";
 
 export const dynamic = "force-dynamic";
 

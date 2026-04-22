@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@serpio/database";
 import { users, creditTransactions } from "@serpio/database";
-import { eq, desc, and, gte, lte } from "drizzle-orm";
+import { eq, desc, and, gte, lte } from "@serpio/database";
 
 export async function GET(req: NextRequest) {
   const session = await auth();

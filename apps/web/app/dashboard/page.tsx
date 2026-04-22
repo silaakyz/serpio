@@ -3,7 +3,7 @@ import { ScrapeStarter } from "@/components/dashboard/ScrapeStarter";
 import Link from "next/link";
 import { db } from "@serpio/database";
 import { articles, projects, jobs, users } from "@serpio/database";
-import { eq, ne, count, and, desc } from "drizzle-orm";
+import { eq, ne, count, and, desc } from "@serpio/database";
 
 const JOB_TYPE_LABELS: Record<string, string> = {
   scrape:       "Web Taraması",

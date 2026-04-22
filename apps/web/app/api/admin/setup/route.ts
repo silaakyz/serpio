@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@serpio/database";
 import { users } from "@serpio/database";
-import { eq, count } from "drizzle-orm";
+import { eq, count } from "@serpio/database";
 
 export const dynamic = "force-dynamic";
 

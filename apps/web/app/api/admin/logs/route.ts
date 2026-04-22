@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminResponse } from "@/lib/admin-guard";
 import { db } from "@serpio/database";
 import { jobLogs, jobs, projects, users } from "@serpio/database";
-import { count, eq, desc } from "drizzle-orm";
+import { count, eq, desc } from "@serpio/database";
 
 export const dynamic = "force-dynamic";
 

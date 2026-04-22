@@ -3,7 +3,7 @@ import Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import { db } from "@serpio/database";
 import { users, creditTransactions, subscriptions } from "@serpio/database";
-import { eq } from "drizzle-orm";
+import { eq } from "@serpio/database";
 
 export const dynamic = "force-dynamic";
 

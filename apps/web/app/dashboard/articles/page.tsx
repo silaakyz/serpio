@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@serpio/database";
 import { articles, projects } from "@serpio/database";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc } from "@serpio/database";
 import { ArticlesTable } from "@/components/dashboard/ArticlesTable";
 import Link from "next/link";
 

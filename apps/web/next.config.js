@@ -2,6 +2,14 @@
 const nextConfig = {
   transpilePackages: ["@serpio/ui", "@serpio/database", "@serpio/types"],
 
+  // Production optimizasyonları
+  compress: true,
+  poweredByHeader: false,
+  productionBrowserSourceMaps: false,
+
+  // Docker/Railway için standalone output — sadece STANDALONE=true env ile aktif
+  output: process.env.STANDALONE === "true" ? "standalone" : undefined,
+
   images: {
     remotePatterns: [{ protocol: "https", hostname: "**" }],
   },

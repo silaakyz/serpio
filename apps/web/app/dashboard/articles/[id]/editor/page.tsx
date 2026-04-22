@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { db } from "@serpio/database";
 import { articles, projects } from "@serpio/database";
-import { eq } from "drizzle-orm";
+import { eq } from "@serpio/database";
 import { ArticleEditor } from "@/components/editor/ArticleEditor";
 import Link from "next/link";
 

@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { db } from "@serpio/database";
 import { jobs, projects } from "@serpio/database";
-import { eq } from "drizzle-orm";
+import { eq } from "@serpio/database";
 import { Queue } from "bullmq";
 import Redis from "ioredis";
 

@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { rateLimit } from "@/lib/rate-limit";
 import { db } from "@serpio/database";
 import { users, creditTransactions } from "@serpio/database";
-import { eq } from "drizzle-orm";
+import { eq } from "@serpio/database";
 
 export async function POST(req: NextRequest) {
   const { success } = rateLimit(req, 5, 3_600_000); // 5/saat per IP

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@serpio/database";
 import { articles, projects } from "@serpio/database";
-import { eq } from "drizzle-orm";
+import { eq } from "@serpio/database";
 
 export async function PATCH(
   req: NextRequest,

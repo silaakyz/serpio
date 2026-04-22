@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@serpio/database";
 import { jobs, projects, articles } from "@serpio/database";
-import { eq } from "drizzle-orm";
+import { eq } from "@serpio/database";
 import { Queue } from "bullmq";
 import Redis from "ioredis";
 

@@ -1,6 +1,6 @@
 import { db } from "@serpio/database";
 import { users } from "@serpio/database";
-import { eq } from "drizzle-orm";
+import { eq } from "@serpio/database";
 
 export async function getUserCredits(userId: string): Promise<number> {
   const user = await db.query.users.findFirst({

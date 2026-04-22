@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm turbo run build
+        env:
+          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+          TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+          # next build için sahte değerler (DB'ye bağlanmaz, sadece derleme)
+          DATABASE_URL: "postgresql://fake:fake@localhost/fake"
+          REDIS_URL: "redis://localhost:6379"
+          AUTH_SECRET: "ci-secret-placeholder-32-chars-ok"
+          AUTH_URL: "http://localhost:3000"
+
+      - name: Test (unit)
+        run: pnpm --filter @serpio/worker test

@@ -5,7 +5,7 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { db } from "@serpio/database";
 import { users } from "@serpio/database";
-import { eq } from "drizzle-orm";
+import { eq } from "@serpio/database";
 import { authConfig } from "./auth.config";
 
 /**
@@ -16,7 +16,8 @@ import { authConfig } from "./auth.config";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
-  adapter: DrizzleAdapter(db),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  adapter: DrizzleAdapter(db as any),
   providers: [
     Google({
       clientId:     process.env.AUTH_GOOGLE_ID ?? "",

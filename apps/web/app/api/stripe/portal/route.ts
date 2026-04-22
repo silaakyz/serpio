@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { stripe } from "@/lib/stripe";
 import { db } from "@serpio/database";
 import { subscriptions } from "@serpio/database";
-import { eq } from "drizzle-orm";
+import { eq } from "@serpio/database";
 
 export async function POST() {
   if (!process.env.STRIPE_SECRET_KEY) {
