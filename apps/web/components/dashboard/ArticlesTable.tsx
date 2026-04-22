@@ -312,12 +312,23 @@ export function ArticlesTable({ articles, projectId, initialStatus, initialStale
           <table className="w-full text-sm font-ui">
             <thead>
               <tr className="border-b border-border bg-elevated/50">
-                {["Başlık", "URL", "Durum", "Eskime", "GEO Skoru", "Son Güncelleme", "Aksiyonlar"].map((h) => (
+                {[
+                  { label: "Başlık" },
+                  { label: "URL" },
+                  { label: "Durum" },
+                  { label: "Eskime" },
+                  { label: "GEO Skoru" },
+                  { label: "Pozisyon", title: "Google'daki ortalama sıralama (GSC verisi)" },
+                  { label: "Tıklama/ay", title: "Son 90 gün toplam tıklama (GSC verisi)" },
+                  { label: "Son Güncelleme" },
+                  { label: "Aksiyonlar" },
+                ].map(({ label, title }) => (
                   <th
-                    key={h}
+                    key={label}
+                    title={title}
                     className="text-left px-4 py-3 text-muted font-medium text-xs uppercase tracking-wider whitespace-nowrap"
                   >
-                    {h}
+                    {label}
                   </th>
                 ))}
               </tr>
@@ -325,7 +336,7 @@ export function ArticlesTable({ articles, projectId, initialStatus, initialStale
             <tbody>
               {paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-20 text-center">
+                  <td colSpan={9} className="py-20 text-center">
                     <p className="text-muted text-sm">
                       {articles.length === 0
                         ? "Henüz makale yok. İlk taramanızı başlatın!"
@@ -402,6 +413,33 @@ export function ArticlesTable({ articles, projectId, initialStatus, initialStale
                         </button>
                       )}
                     </td>
+                    {/* Pozisyon (GSC) */}
+                    <td className="px-4 py-3 text-right">
+                      {a.currentPosition != null ? (
+                        <span
+                          className={`text-xs font-mono font-semibold ${
+                            a.currentPosition <= 3  ? "text-emerald" :
+                            a.currentPosition <= 10 ? "text-yellow-400" : "text-muted"
+                          }`}
+                        >
+                          #{a.currentPosition.toFixed(1)}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-border">—</span>
+                      )}
+                    </td>
+
+                    {/* Tıklama/ay (GSC) */}
+                    <td className="px-4 py-3 text-right">
+                      {a.monthlyClicks != null && a.monthlyClicks > 0 ? (
+                        <span className="text-xs font-mono text-text">
+                          {a.monthlyClicks.toLocaleString("tr")}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-border">—</span>
+                      )}
+                    </td>
+
                     <td className="px-4 py-3 text-xs text-muted whitespace-nowrap">
                       {fmtDate(a.lastModifiedAt ?? a.originalPublishedAt ?? a.createdAt)}
                     </td>

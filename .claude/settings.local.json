@@ -46,7 +46,8 @@
       "Bash(pnpm --filter @serpio/database build)",
       "Bash(pnpm db:generate)",
       "Bash(pnpm db:migrate)",
-      "Bash(DATABASE_URL=\"postgresql://serpio:serpio_dev@localhost:5432/serpio_dev\" pnpm db:migrate)"
+      "Bash(DATABASE_URL=\"postgresql://serpio:serpio_dev@localhost:5432/serpio_dev\" pnpm db:migrate)",
+      "Bash(pnpm --filter @serpio/worker add googleapis)"
     ]
   }
 }

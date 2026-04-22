@@ -9,10 +9,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { searchParams } = new URL(req.url);
-  const projectId = searchParams.get("projectId");
+  const projectId = req.nextUrl.searchParams.get("projectId");
   if (!projectId) {
-    return NextResponse.json({ error: "projectId zorunlu" }, { status: 400 });
+    return NextResponse.json({ error: "projectId gerekli" }, { status: 400 });
   }
 
   const project = await db.query.projects.findFirst({
@@ -22,9 +21,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Proje bulunamadı" }, { status: 404 });
   }
 
-  // State = projectId|userId (URL-safe base64)
-  const state = Buffer.from(`${projectId}|${session.user.id}`).toString("base64url");
-  const url = getGoogleAuthUrl(state);
-
-  return NextResponse.redirect(url);
+  // state = projectId (callback'te session'dan userId alınır)
+  const url = getGoogleAuthUrl(projectId);
+  return NextResponse.json({ url });
 }

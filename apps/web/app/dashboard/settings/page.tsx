@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 
-type Tab = "general" | "publishing" | "external-links";
+type Tab = "general" | "publishing" | "external-links" | "performance";
 
 type PublishingChannel =
   | "wordpress" | "shopify" | "ghost" | "webflow"
@@ -98,7 +98,26 @@ interface ProjectData {
 }
 
 export default function SettingsPage() {
-  const [tab, setTab] = useState<Tab>("general");
+  const [tab, setTab] = useState<Tab>(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const t = params.get("tab") as Tab | null;
+      if (t && ["general", "publishing", "external-links", "performance"].includes(t)) return t;
+    }
+    return "general";
+  });
+
+  // Google bağlantı state
+  const [googleConn, setGoogleConn] = useState<{
+    connected: boolean;
+    gscSiteUrl?: string | null;
+    ga4PropertyId?: string | null;
+    updatedAt?: string | null;
+  } | null>(null);
+  const [googleSites, setGoogleSites] = useState<{ siteUrl?: string | null }[]>([]);
+  const [gscSaving, setGscSaving] = useState(false);
+  const [gscMsg, setGscMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [syncLoading, setSyncLoading] = useState(false);
   const [channel, setChannel] = useState<PublishingChannel>("wordpress");
   const [project, setProject] = useState<ProjectData | null>(null);
   const [projectLoading, setProjectLoading] = useState(true);
@@ -131,6 +150,22 @@ export default function SettingsPage() {
           setProjUrl(p.websiteUrl);
           setChannel((p.activeChannel as PublishingChannel) ?? "wordpress");
           setChannelConfig((p.publishConfig?.[p.activeChannel] as Record<string, string>) ?? {});
+
+          // Google bağlantı durumunu yükle
+          const connRes = await fetch(`/api/google/connection?projectId=${p.id}`);
+          if (connRes.ok) {
+            const connData = await connRes.json() as typeof googleConn;
+            setGoogleConn(connData);
+
+            // Bağlıysa site listesini çek
+            if (connData?.connected) {
+              const sitesRes = await fetch(`/api/google/sites?projectId=${p.id}`);
+              if (sitesRes.ok) {
+                const sitesData = await sitesRes.json() as { sites: { siteUrl?: string | null }[] };
+                setGoogleSites(sitesData.sites ?? []);
+              }
+            }
+          }
         }
       } finally {
         setProjectLoading(false);
@@ -240,9 +275,10 @@ export default function SettingsPage() {
 
       {/* Tab Navigasyonu */}
       <div className="flex border-b border-border">
-        <button className={tabClass("general")} onClick={() => setTab("general")}>Genel</button>
-        <button className={tabClass("publishing")} onClick={() => setTab("publishing")}>Yayınlama</button>
+        <button className={tabClass("general")}        onClick={() => setTab("general")}>Genel</button>
+        <button className={tabClass("publishing")}     onClick={() => setTab("publishing")}>Yayınlama</button>
         <button className={tabClass("external-links")} onClick={() => setTab("external-links")}>Dış Linkler</button>
+        <button className={tabClass("performance")}    onClick={() => setTab("performance")}>Performans</button>
       </div>
 
       {/* Genel Tab */}
@@ -447,6 +483,170 @@ export default function SettingsPage() {
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Performans Tab */}
+      {tab === "performance" && (
+        <div className="space-y-4">
+          {/* Bağlantı Durumu Kartı */}
+          <div className="bg-surface border border-border rounded-xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-elevated flex items-center justify-center">
+                  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
+                    <circle cx="12" cy="12" r="10" fill="#4285F4" fillOpacity="0.15"/>
+                    <path d="M12 2v10l8.66 5A10 10 0 0012 2z" fill="#34A853"/>
+                    <path d="M3.34 17A10 10 0 0012 22v-10L3.34 17z" fill="#FBBC05"/>
+                    <path d="M3.34 7A10 10 0 0112 2v10L3.34 7z" fill="#EA4335"/>
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-ui font-semibold text-text">Google Search Console & Analytics</p>
+                  <p className="text-xs text-muted font-ui">Performans verilerini senkronize et</p>
+                </div>
+              </div>
+              {googleConn?.connected ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-ui font-medium bg-emerald/10 text-emerald border border-emerald/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald"></span>
+                  Bağlı
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-ui font-medium bg-elevated text-muted border border-border">
+                  <span className="w-1.5 h-1.5 rounded-full bg-muted"></span>
+                  Bağlı Değil
+                </span>
+              )}
+            </div>
+
+            {!googleConn?.connected ? (
+              <div className="space-y-3">
+                <p className="text-sm text-muted font-ui">
+                  Google hesabınızı bağlayarak Search Console tıklama verilerini ve Analytics 4
+                  oturum metriklerini otomatik senkronize edin.
+                </p>
+                <button
+                  onClick={async () => {
+                    if (!project) return;
+                    const res = await fetch(`/api/google/auth?projectId=${project.id}`);
+                    const data = await res.json() as { url?: string };
+                    if (data.url) window.location.href = data.url;
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-tech-blue text-white rounded-lg text-sm font-ui font-medium hover:bg-tech-blue/90 transition-colors"
+                >
+                  Google ile Bağlan
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* GSC Site URL */}
+                <div>
+                  <label className={labelClass}>Search Console Sitesi</label>
+                  {googleSites.length > 0 ? (
+                    <select
+                      defaultValue={googleConn.gscSiteUrl ?? ""}
+                      id="gsc-site-select"
+                      className={inputClass}
+                    >
+                      <option value="">Seç...</option>
+                      {googleSites.map((s) => (
+                        <option key={s.siteUrl ?? ""} value={s.siteUrl ?? ""}>
+                          {s.siteUrl}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="url"
+                      id="gsc-site-select"
+                      defaultValue={googleConn.gscSiteUrl ?? ""}
+                      placeholder="https://siteniz.com"
+                      className={inputClass}
+                    />
+                  )}
+                </div>
+
+                {/* Son sync tarihi */}
+                {googleConn.updatedAt && (
+                  <p className="text-xs text-muted font-ui">
+                    Son güncelleme: {new Date(googleConn.updatedAt).toLocaleString("tr-TR")}
+                  </p>
+                )}
+
+                {gscMsg && (
+                  <p className={`text-xs font-ui ${gscMsg.ok ? "text-emerald" : "text-red-400"}`}>
+                    {gscMsg.text}
+                  </p>
+                )}
+
+                <div className="flex items-center gap-3 flex-wrap">
+                  {/* Kaydet */}
+                  <button
+                    disabled={gscSaving}
+                    onClick={async () => {
+                      if (!project) return;
+                      setGscSaving(true);
+                      try {
+                        const sel = document.getElementById("gsc-site-select") as HTMLSelectElement | HTMLInputElement;
+                        await fetch(`/api/google/connection?projectId=${project.id}`, {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ gscSiteUrl: sel?.value || null }),
+                        });
+                        setGoogleConn((c) => c ? { ...c, gscSiteUrl: (document.getElementById("gsc-site-select") as HTMLInputElement)?.value || null } : c);
+                        setGscMsg({ ok: true, text: "Kaydedildi ✓" });
+                      } catch {
+                        setGscMsg({ ok: false, text: "Kaydetme hatası" });
+                      } finally {
+                        setGscSaving(false);
+                        setTimeout(() => setGscMsg(null), 3000);
+                      }
+                    }}
+                    className="px-4 py-2 rounded-lg bg-emerald text-void text-sm font-ui font-medium hover:bg-emerald/90 disabled:opacity-50 transition-colors"
+                  >
+                    {gscSaving ? "Kaydediliyor..." : "Kaydet"}
+                  </button>
+
+                  {/* Sync */}
+                  <button
+                    disabled={syncLoading}
+                    onClick={async () => {
+                      if (!project) return;
+                      setSyncLoading(true);
+                      try {
+                        await fetch("/api/google/sync", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ projectId: project.id }),
+                        });
+                        setGscMsg({ ok: true, text: "Senkronizasyon kuyruğa eklendi ✓" });
+                      } catch {
+                        setGscMsg({ ok: false, text: "Senkronizasyon başlatılamadı" });
+                      } finally {
+                        setSyncLoading(false);
+                        setTimeout(() => setGscMsg(null), 4000);
+                      }
+                    }}
+                    className="px-4 py-2 rounded-lg bg-tech-blue text-white text-sm font-ui font-medium hover:bg-tech-blue/90 disabled:opacity-50 transition-colors"
+                  >
+                    {syncLoading ? "Ekleniyor..." : "Şimdi Senkronize Et"}
+                  </button>
+
+                  {/* Bağlantıyı Kaldır */}
+                  <button
+                    onClick={async () => {
+                      if (!project || !confirm("Google bağlantısını kaldırmak istediğinize emin misiniz?")) return;
+                      await fetch(`/api/google/connection?projectId=${project.id}`, { method: "DELETE" });
+                      setGoogleConn({ connected: false });
+                    }}
+                    className="px-4 py-2 rounded-lg border border-border text-muted text-sm font-ui font-medium hover:text-red-400 hover:border-red-400/50 transition-colors"
+                  >
+                    Bağlantıyı Kaldır
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

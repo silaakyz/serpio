@@ -1,43 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
-import { exchangeCodeForTokens } from "@/lib/google";
+import { auth } from "@/lib/auth";
+import { createOAuth2Client } from "@/lib/google";
 import { db, googleConnections, eq } from "@serpio/database";
 
 export async function GET(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.redirect(new URL("/login", req.url));
+  }
+
   const { searchParams } = new URL(req.url);
-  const code = searchParams.get("code");
-  const state = searchParams.get("state");
-  const error = searchParams.get("error");
+  const code      = searchParams.get("code");
+  const projectId = searchParams.get("state"); // OAuth state = projectId
+  const error     = searchParams.get("error");
 
-  const dashUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-
-  if (error) {
-    return NextResponse.redirect(`${dashUrl}/dashboard/performance?error=google_denied`);
-  }
-
-  if (!code || !state) {
-    return NextResponse.redirect(`${dashUrl}/dashboard/performance?error=invalid_callback`);
-  }
-
-  let projectId: string;
-  let userId: string;
-  try {
-    const decoded = Buffer.from(state, "base64url").toString("utf-8");
-    [projectId, userId] = decoded.split("|");
-    if (!projectId || !userId) throw new Error("bad state");
-  } catch {
-    return NextResponse.redirect(`${dashUrl}/dashboard/performance?error=invalid_state`);
+  if (error || !code || !projectId) {
+    return NextResponse.redirect(
+      new URL("/dashboard/settings?tab=performance&error=google_auth_failed", req.url)
+    );
   }
 
   try {
-    const tokens = await exchangeCodeForTokens(code);
+    const oauth2Client = createOAuth2Client();
+    const { tokens } = await oauth2Client.getToken(code);
+
     if (!tokens.access_token || !tokens.refresh_token) {
-      return NextResponse.redirect(`${dashUrl}/dashboard/performance?error=no_refresh_token`);
+      throw new Error("Token alınamadı");
     }
 
-    const expiresAt = new Date(tokens.expiry_date ?? Date.now() + 3600_000);
-    const scope = tokens.scope ?? "";
+    const expiresAt = tokens.expiry_date ? new Date(tokens.expiry_date) : new Date(Date.now() + 3600_000);
 
-    // Upsert — bu proje için tek bağlantı
+    // Upsert
     const existing = await db.query.googleConnections.findFirst({
       where: eq(googleConnections.projectId, projectId),
     });
@@ -49,24 +42,27 @@ export async function GET(req: NextRequest) {
           accessToken:    tokens.access_token,
           refreshToken:   tokens.refresh_token,
           tokenExpiresAt: expiresAt,
-          scope,
+          scope:          tokens.scope ?? existing.scope,
           updatedAt:      new Date(),
         })
         .where(eq(googleConnections.projectId, projectId));
     } else {
       await db.insert(googleConnections).values({
         projectId,
-        userId,
+        userId:         session.user.id,
         accessToken:    tokens.access_token,
         refreshToken:   tokens.refresh_token,
         tokenExpiresAt: expiresAt,
-        scope,
+        scope:          tokens.scope ?? "",
       });
     }
 
-    return NextResponse.redirect(`${dashUrl}/dashboard/performance?connected=1`);
-  } catch (err) {
-    console.error("[Google OAuth callback error]", err);
-    return NextResponse.redirect(`${dashUrl}/dashboard/performance?error=token_exchange`);
+    return NextResponse.redirect(
+      new URL("/dashboard/settings?tab=performance&success=google_connected", req.url)
+    );
+  } catch {
+    return NextResponse.redirect(
+      new URL("/dashboard/settings?tab=performance&error=token_exchange_failed", req.url)
+    );
   }
 }
