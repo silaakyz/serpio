@@ -30,7 +30,23 @@
       "Bash(DATABASE_URL=\"postgresql://serpio:serpio_dev@localhost:5432/serpio_dev\" REDIS_URL=\"redis://127.0.0.1:6380\" npx tsx src/inject-job.ts)",
       "Bash(git init *)",
       "Bash(git remote *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(npx tsc *)",
+      "Bash(pnpm build *)",
+      "Bash(DATABASE_URL=\"postgresql://serpio:serpio_dev@localhost:5432/serpio_dev\" pnpm drizzle-kit generate)",
+      "Bash(ls /c/Users/akyzs/serpio/apps/web/.env*)",
+      "Bash(pnpm --filter web build)",
+      "Bash(pnpm test *)",
+      "Bash(grep -n \"drizzle-orm\" /c/Users/akyzs/serpio/apps/web/app/dashboard/articles/[id]/editor/page.tsx)",
+      "Bash(pnpm --filter @serpio/worker test)",
+      "Bash(pnpm install *)",
+      "Bash(pnpm --filter @serpio/web add googleapis)",
+      "Bash(pnpm --filter @serpio/database build)",
+      "Bash(pnpm db:generate)",
+      "Bash(pnpm db:migrate)",
+      "Bash(DATABASE_URL=\"postgresql://serpio:serpio_dev@localhost:5432/serpio_dev\" pnpm db:migrate)"
     ]
   }
 }

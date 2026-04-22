@@ -58,6 +58,8 @@ export const jobTypeEnum = pgEnum("job_type", [
   "geo_analyze",
   "geo_optimize",
   "publish",
+  "gsc_sync",
+  "ga_sync",
 ]);
 
 export const jobStatusEnum = pgEnum("job_status", [
@@ -377,6 +379,77 @@ export const subscriptions = pgTable(
   })
 );
 
+// ─── Google Bağlantısı ────────────────────────────────────────────────────────
+
+export const googleConnections = pgTable(
+  "google_connections",
+  {
+    id:             text("id").primaryKey().$defaultFn(() => createId()),
+    projectId:      text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+    userId:         text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    accessToken:    text("access_token").notNull(),
+    refreshToken:   text("refresh_token").notNull(),
+    tokenExpiresAt: timestamp("token_expires_at", { mode: "date" }).notNull(),
+    gscSiteUrl:     text("gsc_site_url"),
+    ga4PropertyId:  text("ga4_property_id"),
+    scope:          text("scope").notNull(),
+    createdAt:      timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt:      timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    projectIdIdx: uniqueIndex("google_conn_project_id_idx").on(table.projectId),
+    userIdIdx:    index("google_conn_user_id_idx").on(table.userId),
+  })
+);
+
+// ─── GSC Metrikleri ───────────────────────────────────────────────────────────
+
+export const gscMetrics = pgTable(
+  "gsc_metrics",
+  {
+    id:          text("id").primaryKey().$defaultFn(() => createId()),
+    articleId:   text("article_id").notNull().references(() => articles.id, { onDelete: "cascade" }),
+    projectId:   text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+    pageUrl:     text("page_url").notNull(),
+    date:        text("date").notNull(), // YYYY-MM-DD
+    clicks:      integer("clicks").notNull().default(0),
+    impressions: integer("impressions").notNull().default(0),
+    position:    real("position").notNull().default(0),
+    ctr:         real("ctr").notNull().default(0),
+    createdAt:   timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    articleIdIdx:   index("gsc_metrics_article_id_idx").on(table.articleId),
+    projectIdIdx:   index("gsc_metrics_project_id_idx").on(table.projectId),
+    dateIdx:        index("gsc_metrics_date_idx").on(table.date),
+    uniquePageDate: uniqueIndex("gsc_metrics_page_date_idx").on(table.pageUrl, table.date),
+  })
+);
+
+// ─── GA4 Metrikleri ───────────────────────────────────────────────────────────
+
+export const gaMetrics = pgTable(
+  "ga_metrics",
+  {
+    id:                  text("id").primaryKey().$defaultFn(() => createId()),
+    articleId:           text("article_id").notNull().references(() => articles.id, { onDelete: "cascade" }),
+    projectId:           text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+    pageUrl:             text("page_url").notNull(),
+    date:                text("date").notNull(), // YYYY-MM-DD
+    sessions:            integer("sessions").notNull().default(0),
+    bounceRate:          real("bounce_rate").notNull().default(0),
+    avgSessionDuration:  real("avg_session_duration").notNull().default(0),
+    conversions:         integer("conversions").notNull().default(0),
+    createdAt:           timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    articleIdIdx:   index("ga_metrics_article_id_idx").on(table.articleId),
+    projectIdIdx:   index("ga_metrics_project_id_idx").on(table.projectId),
+    dateIdx:        index("ga_metrics_date_idx").on(table.date),
+    uniquePageDate: uniqueIndex("ga_metrics_page_date_idx").on(table.pageUrl, table.date),
+  })
+);
+
 // ─── $inferSelect Tip Export'ları ─────────────────────────────────────────────
 
 export type User               = typeof users.$inferSelect;
@@ -391,3 +464,6 @@ export type JobLog             = typeof jobLogs.$inferSelect;
 export type ExternalLinkSource = typeof externalLinkSources.$inferSelect;
 export type CreditTransaction  = typeof creditTransactions.$inferSelect;
 export type Subscription       = typeof subscriptions.$inferSelect;
+export type GoogleConnection   = typeof googleConnections.$inferSelect;
+export type GscMetric          = typeof gscMetrics.$inferSelect;
+export type GaMetric           = typeof gaMetrics.$inferSelect;

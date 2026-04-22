@@ -10,6 +10,9 @@ import {
   jobLogs,
   creditTransactions,
   subscriptions,
+  googleConnections,
+  gscMetrics,
+  gaMetrics,
 } from "./schema";
 
 export const usersRelations = relations(users, ({ many, one }) => ({
@@ -17,6 +20,7 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   sessions:           many(sessions),
   projects:           many(projects),
   creditTransactions: many(creditTransactions),
+  googleConnections:  many(googleConnections),
   subscription: one(subscriptions, {
     fields:     [users.id],
     references: [subscriptions.userId],
@@ -36,11 +40,16 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   articles:            many(articles),
   externalLinkSources: many(externalLinkSources),
   jobs:                many(jobs),
+  googleConnection:    one(googleConnections, { fields: [projects.id], references: [googleConnections.projectId] }),
+  gscMetrics:          many(gscMetrics),
+  gaMetrics:           many(gaMetrics),
 }));
 
 export const articlesRelations = relations(articles, ({ one, many }) => ({
-  project: one(projects, { fields: [articles.projectId], references: [projects.id] }),
-  jobs:    many(jobs),
+  project:    one(projects, { fields: [articles.projectId], references: [projects.id] }),
+  jobs:       many(jobs),
+  gscMetrics: many(gscMetrics),
+  gaMetrics:  many(gaMetrics),
 }));
 
 export const externalLinkSourcesRelations = relations(externalLinkSources, ({ one }) => ({
@@ -69,4 +78,19 @@ export const creditTransactionsRelations = relations(creditTransactions, ({ one 
 
 export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
   user: one(users, { fields: [subscriptions.userId], references: [users.id] }),
+}));
+
+export const googleConnectionsRelations = relations(googleConnections, ({ one }) => ({
+  project: one(projects, { fields: [googleConnections.projectId], references: [projects.id] }),
+  user:    one(users,    { fields: [googleConnections.userId],    references: [users.id]    }),
+}));
+
+export const gscMetricsRelations = relations(gscMetrics, ({ one }) => ({
+  article: one(articles, { fields: [gscMetrics.articleId], references: [articles.id] }),
+  project: one(projects, { fields: [gscMetrics.projectId], references: [projects.id] }),
+}));
+
+export const gaMetricsRelations = relations(gaMetrics, ({ one }) => ({
+  article: one(articles, { fields: [gaMetrics.articleId], references: [articles.id] }),
+  project: one(projects, { fields: [gaMetrics.projectId], references: [projects.id] }),
 }));
