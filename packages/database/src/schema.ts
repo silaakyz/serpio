@@ -60,6 +60,8 @@ export const jobTypeEnum = pgEnum("job_type", [
   "publish",
   "gsc_sync",
   "ga_sync",
+  "competitor_crawl",
+  "content_gap",
 ]);
 
 export const jobStatusEnum = pgEnum("job_status", [
@@ -529,6 +531,73 @@ export const gaMetrics = pgTable(
   })
 );
 
+// ─── Rakipler ─────────────────────────────────────────────────────────────────
+
+export const competitors = pgTable("competitors", {
+  id:            text("id").primaryKey().$defaultFn(() => createId()),
+  projectId:     text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  name:          text("name").notNull(),
+  websiteUrl:    text("website_url").notNull(),
+  isActive:      boolean("is_active").notNull().default(true),
+  lastCrawledAt: timestamp("last_crawled_at", { mode: "date" }),
+  totalPages:    integer("total_pages").default(0),
+  createdAt:     timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  projectIdx: index("competitors_project_idx").on(table.projectId),
+}));
+
+// ─── Rakip Sayfaları ──────────────────────────────────────────────────────────
+
+export const competitorPages = pgTable("competitor_pages", {
+  id:           text("id").primaryKey().$defaultFn(() => createId()),
+  competitorId: text("competitor_id").notNull().references(() => competitors.id, { onDelete: "cascade" }),
+  url:          text("url").notNull(),
+  title:        text("title"),
+  contentHash:  text("content_hash"),
+  keywords:     json("keywords").$type<string[]>().default([]),
+  wordCount:    integer("word_count").default(0),
+  status:       text("status").notNull().default("active"),
+  firstSeenAt:  timestamp("first_seen_at", { mode: "date" }).notNull().defaultNow(),
+  lastChangedAt: timestamp("last_changed_at", { mode: "date" }),
+  lastCheckedAt: timestamp("last_checked_at", { mode: "date" }),
+}, (table) => ({
+  competitorIdx: index("competitor_pages_competitor_idx").on(table.competitorId),
+  urlIdx:        uniqueIndex("competitor_pages_url_idx").on(table.url),
+}));
+
+// ─── Rakip Değişiklikleri ─────────────────────────────────────────────────────
+
+export const competitorChanges = pgTable("competitor_changes", {
+  id:               text("id").primaryKey().$defaultFn(() => createId()),
+  competitorPageId: text("competitor_page_id").notNull().references(() => competitorPages.id, { onDelete: "cascade" }),
+  competitorId:     text("competitor_id").notNull().references(() => competitors.id, { onDelete: "cascade" }),
+  changeType:       text("change_type").notNull(),
+  oldHash:          text("old_hash"),
+  newHash:          text("new_hash"),
+  summary:          text("summary"),
+  detectedAt:       timestamp("detected_at", { mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  competitorIdx: index("competitor_changes_competitor_idx").on(table.competitorId),
+  detectedIdx:   index("competitor_changes_detected_idx").on(table.detectedAt),
+}));
+
+// ─── İçerik Boşlukları ───────────────────────────────────────────────────────
+
+export const contentGaps = pgTable("content_gaps", {
+  id:             text("id").primaryKey().$defaultFn(() => createId()),
+  projectId:      text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  keyword:        text("keyword").notNull(),
+  keywordCluster: text("keyword_cluster"),
+  competitorUrls: json("competitor_urls").$type<string[]>().default([]),
+  priorityScore:  integer("priority_score"),
+  status:         text("status").notNull().default("open"),
+  suggestedTitle: text("suggested_title"),
+  createdAt:      timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  projectIdx: index("content_gaps_project_idx").on(table.projectId),
+  statusIdx:  index("content_gaps_status_idx").on(table.status),
+}));
+
 // ─── $inferSelect Tip Export'ları ─────────────────────────────────────────────
 
 export type User               = typeof users.$inferSelect;
@@ -548,3 +617,7 @@ export type SiteAuditIssue     = typeof siteAuditIssues.$inferSelect;
 export type SiteAuditSnapshot  = typeof siteAuditSnapshots.$inferSelect;
 export type GscMetric          = typeof gscMetrics.$inferSelect;
 export type GaMetric           = typeof gaMetrics.$inferSelect;
+export type Competitor         = typeof competitors.$inferSelect;
+export type CompetitorPage     = typeof competitorPages.$inferSelect;
+export type CompetitorChange   = typeof competitorChanges.$inferSelect;
+export type ContentGap         = typeof contentGaps.$inferSelect;

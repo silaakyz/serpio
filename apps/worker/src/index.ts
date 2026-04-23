@@ -5,7 +5,9 @@ import aiWorker from "./processors/ai.processor";
 import publishWorker from "./processors/publish.processor";
 import geoWorker from "./processors/geo.processor";
 import gscSyncWorker from "./processors/gsc-sync.processor";
+import competitorWorker from "./processors/competitor.processor";
 import { gscSyncQueue } from "./queues/gsc-sync.queue";
+import { competitorQueue } from "./queues/competitor.queue";
 import { AI_PROVIDER, AI_MODEL } from "./lib/ai-client";
 
 console.log("⚡ Serpio Worker başlatılıyor...");
@@ -14,6 +16,7 @@ console.log("🤖 AI worker aktif — kuyruk dinleniyor...");
 console.log("🚀 Publish worker aktif — kuyruk dinleniyor...");
 console.log("🌐 GEO worker aktif — kuyruk dinleniyor...");
 console.log("📊 GSC Sync worker aktif — kuyruk dinleniyor...");
+console.log("🎯 Competitor worker aktif — kuyruk dinleniyor...");
 console.log(`   Redis:    ${process.env.REDIS_URL ?? "redis://127.0.0.1:6380"}`);
 console.log(`   DB:       ${(process.env.DATABASE_URL ?? "not set").replace(/:[^:@]*@/, ":***@")}`);
 console.log(`   AI:       ${AI_PROVIDER} / ${AI_MODEL}`);
@@ -38,6 +41,18 @@ async function scheduleCronJobs() {
     );
 
     console.log("⏰ Günlük GSC sync zamanlandı (03:00 UTC)");
+
+    // Haftalık rakip taraması — her Pazartesi 04:00 UTC
+    const competitorRepeatables = await competitorQueue.getRepeatableJobs();
+    for (const job of competitorRepeatables) {
+      await competitorQueue.removeRepeatableByKey(job.key);
+    }
+    await competitorQueue.add(
+      "weekly-competitor-crawl",
+      { type: "crawl_all", projectId: "all", userId: "system", jobDbId: "system" },
+      { repeat: { pattern: "0 4 * * 1" }, jobId: "weekly-competitor-crawl" }
+    );
+    console.log("⏰ Haftalık rakip taraması zamanlandı (Pazartesi 04:00 UTC)");
   } catch (err) {
     console.error("Cron job zamanlaması başarısız:", err);
   }
@@ -68,6 +83,7 @@ async function shutdown(signal: string) {
   await publishWorker.close();
   await geoWorker.close();
   await gscSyncWorker.close();
+  await competitorWorker.close();
   process.exit(0);
 }
 

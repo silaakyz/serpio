@@ -15,6 +15,10 @@ import {
   gaMetrics,
   siteAuditIssues,
   siteAuditSnapshots,
+  competitors,
+  competitorPages,
+  competitorChanges,
+  contentGaps,
 } from "./schema";
 
 export const usersRelations = relations(users, ({ many, one }) => ({
@@ -47,6 +51,8 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   gaMetrics:           many(gaMetrics),
   siteAuditIssues:     many(siteAuditIssues),
   siteAuditSnapshots:  many(siteAuditSnapshots),
+  competitors:         many(competitors),
+  contentGaps:         many(contentGaps),
 }));
 
 export const articlesRelations = relations(articles, ({ one, many }) => ({
@@ -107,4 +113,24 @@ export const siteAuditIssuesRelations = relations(siteAuditIssues, ({ one }) => 
 
 export const siteAuditSnapshotsRelations = relations(siteAuditSnapshots, ({ one }) => ({
   project: one(projects, { fields: [siteAuditSnapshots.projectId], references: [projects.id] }),
+}));
+
+export const competitorsRelations = relations(competitors, ({ one, many }) => ({
+  project: one(projects, { fields: [competitors.projectId], references: [projects.id] }),
+  pages:   many(competitorPages),
+  changes: many(competitorChanges),
+}));
+
+export const competitorPagesRelations = relations(competitorPages, ({ one, many }) => ({
+  competitor: one(competitors, { fields: [competitorPages.competitorId], references: [competitors.id] }),
+  changes:    many(competitorChanges),
+}));
+
+export const competitorChangesRelations = relations(competitorChanges, ({ one }) => ({
+  competitor: one(competitors,    { fields: [competitorChanges.competitorId],     references: [competitors.id] }),
+  page:       one(competitorPages, { fields: [competitorChanges.competitorPageId], references: [competitorPages.id] }),
+}));
+
+export const contentGapsRelations = relations(contentGaps, ({ one }) => ({
+  project: one(projects, { fields: [contentGaps.projectId], references: [projects.id] }),
 }));

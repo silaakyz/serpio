@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 
-type Tab = "general" | "publishing" | "external-links" | "performance";
+type Tab = "general" | "publishing" | "external-links" | "performance" | "competitors";
 
 type PublishingChannel =
   | "wordpress" | "shopify" | "ghost" | "webflow"
@@ -102,7 +102,7 @@ export default function SettingsPage() {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const t = params.get("tab") as Tab | null;
-      if (t && ["general", "publishing", "external-links", "performance"].includes(t)) return t;
+      if (t && ["general", "publishing", "external-links", "performance", "competitors"].includes(t)) return t;
     }
     return "general";
   });
@@ -128,6 +128,12 @@ export default function SettingsPage() {
   const [generalSaving, setGeneralSaving] = useState(false);
   const [generalMsg, setGeneralMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
+  // Rakipler
+  const [settingsCompetitors, setSettingsCompetitors] = useState<{ id: string; name: string; websiteUrl: string; isActive: boolean }[]>([]);
+  const [newCompName, setNewCompName] = useState("");
+  const [newCompUrl, setNewCompUrl] = useState("");
+  const [addingComp, setAddingComp] = useState(false);
+
   // Publishing form — kanal bazlı field değerleri
   const [channelConfig, setChannelConfig] = useState<Record<string, string>>({});
   const [testLoading, setTestLoading] = useState(false);
@@ -142,7 +148,8 @@ export default function SettingsPage() {
       try {
         const res = await fetch("/api/projects");
         if (!res.ok) return;
-        const list = await res.json() as ProjectData[];
+        const body = await res.json() as { projects?: ProjectData[] };
+        const list = body.projects ?? [];
         if (list.length > 0) {
           const p = list[0];
           setProject(p);
@@ -150,6 +157,13 @@ export default function SettingsPage() {
           setProjUrl(p.websiteUrl);
           setChannel((p.activeChannel as PublishingChannel) ?? "wordpress");
           setChannelConfig((p.publishConfig?.[p.activeChannel] as Record<string, string>) ?? {});
+
+          // Rakipleri yükle
+          const compRes = await fetch(`/api/competitors?projectId=${p.id}`);
+          if (compRes.ok) {
+            const cd = await compRes.json() as { competitors: typeof settingsCompetitors };
+            setSettingsCompetitors(cd.competitors ?? []);
+          }
 
           // Google bağlantı durumunu yükle
           const connRes = await fetch(`/api/google/connection?projectId=${p.id}`);
@@ -279,6 +293,7 @@ export default function SettingsPage() {
         <button className={tabClass("publishing")}     onClick={() => setTab("publishing")}>Yayınlama</button>
         <button className={tabClass("external-links")} onClick={() => setTab("external-links")}>Dış Linkler</button>
         <button className={tabClass("performance")}    onClick={() => setTab("performance")}>Performans</button>
+        <button className={tabClass("competitors")}    onClick={() => setTab("competitors")}>Rakipler</button>
       </div>
 
       {/* Genel Tab */}
@@ -646,6 +661,115 @@ export default function SettingsPage() {
                   </button>
                 </div>
               </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Rakipler Tab */}
+      {tab === "competitors" && (
+        <div className="space-y-5">
+          <div className="bg-surface border border-border rounded-xl p-6 space-y-5">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-ui font-semibold text-text">Rakip Siteler</h3>
+              <span className="text-xs text-muted font-ui">{settingsCompetitors.length} / 10 rakip</span>
+            </div>
+
+            {settingsCompetitors.length === 0 && (
+              <p className="text-sm text-muted font-ui">Henüz rakip eklenmedi.</p>
+            )}
+
+            <div className="space-y-2">
+              {settingsCompetitors.map((c) => (
+                <div key={c.id} className="flex items-center justify-between gap-3 p-3 bg-elevated rounded-lg border border-border">
+                  <div className="min-w-0">
+                    <p className="text-sm font-ui text-text font-medium">{c.name}</p>
+                    <p className="text-xs text-muted font-ui truncate">{c.websiteUrl}</p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button
+                      onClick={async () => {
+                        await fetch(`/api/competitors/${c.id}`, {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ isActive: !c.isActive }),
+                        });
+                        setSettingsCompetitors((prev) => prev.map((x) => x.id === c.id ? { ...x, isActive: !x.isActive } : x));
+                      }}
+                      className={`text-xs font-ui px-2 py-1 rounded border transition-colors ${
+                        c.isActive
+                          ? "border-emerald/30 text-emerald hover:bg-emerald/10"
+                          : "border-border text-muted hover:text-text"
+                      }`}
+                    >
+                      {c.isActive ? "Aktif" : "Pasif"}
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!confirm("Rakibi silmek istediğinize emin misiniz?")) return;
+                        await fetch(`/api/competitors/${c.id}`, { method: "DELETE" });
+                        setSettingsCompetitors((prev) => prev.filter((x) => x.id !== c.id));
+                      }}
+                      className="text-xs font-ui px-2 py-1 rounded border border-red-400/30 text-red-400 hover:bg-red-400/10 transition-colors"
+                    >
+                      Sil
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Yeni rakip formu */}
+            {settingsCompetitors.length < 10 && (
+              <div className="pt-4 border-t border-border space-y-3">
+                <p className="text-xs font-ui font-medium text-muted">Yeni Rakip Ekle</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    type="text"
+                    value={newCompName}
+                    onChange={(e) => setNewCompName(e.target.value)}
+                    placeholder="Rakip adı"
+                    className={inputClass}
+                  />
+                  <input
+                    type="url"
+                    value={newCompUrl}
+                    onChange={(e) => setNewCompUrl(e.target.value)}
+                    placeholder="https://rakip.com"
+                    className={inputClass}
+                  />
+                </div>
+                <button
+                  disabled={addingComp || !newCompName.trim() || !newCompUrl.trim()}
+                  onClick={async () => {
+                    if (!project) return;
+                    setAddingComp(true);
+                    try {
+                      const res = await fetch("/api/competitors", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ projectId: project.id, name: newCompName.trim(), websiteUrl: newCompUrl.trim() }),
+                      });
+                      const data = await res.json() as { competitor?: { id: string; name: string; websiteUrl: string; isActive: boolean }; error?: string };
+                      if (!res.ok) throw new Error(data.error ?? "Eklenemedi");
+                      setSettingsCompetitors((prev) => [...prev, data.competitor!]);
+                      setNewCompName("");
+                      setNewCompUrl("");
+                    } catch (err) {
+                      alert(err instanceof Error ? err.message : "Hata");
+                    } finally {
+                      setAddingComp(false);
+                    }
+                  }}
+                  className="px-4 py-2 rounded-lg bg-emerald text-void text-sm font-ui font-semibold hover:bg-emerald/90 transition-colors disabled:opacity-50"
+                >
+                  {addingComp ? "Ekleniyor..." : "Ekle"}
+                </button>
+              </div>
+            )}
+
+            {settingsCompetitors.length >= 10 && (
+              <p className="text-xs text-yellow-400 font-ui">Maksimum 10 rakip limitine ulaşıldı.</p>
             )}
           </div>
         </div>
