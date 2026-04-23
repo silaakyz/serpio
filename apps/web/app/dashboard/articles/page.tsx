@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@serpio/database";
-import { articles, projects } from "@serpio/database";
-import { eq, desc } from "@serpio/database";
+import { articles, projects, siteAuditIssues } from "@serpio/database";
+import { eq, desc, and, isNull } from "@serpio/database";
 import { ArticlesTable } from "@/components/dashboard/ArticlesTable";
 import Link from "next/link";
 
@@ -32,6 +32,23 @@ export default async function ArticlesPage({ searchParams }: Props) {
       })
     : [];
 
+  // Makale başına audit sorun sayıları
+  const auditCounts: Record<string, { critical: number; warning: number; info: number }> = {};
+  if (project) {
+    const openIssues = await db.query.siteAuditIssues.findMany({
+      where: and(
+        eq(siteAuditIssues.projectId, project.id),
+        isNull(siteAuditIssues.resolvedAt),
+      ),
+      columns: { articleId: true, severity: true },
+    });
+    for (const issue of openIssues) {
+      if (!issue.articleId) continue;
+      if (!auditCounts[issue.articleId]) auditCounts[issue.articleId] = { critical: 0, warning: 0, info: 0 };
+      auditCounts[issue.articleId][issue.severity]++;
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
@@ -55,6 +72,7 @@ export default async function ArticlesPage({ searchParams }: Props) {
         initialStatus={searchParams.status}
         initialStale={searchParams.stale}
         initialQ={searchParams.q}
+        auditCounts={auditCounts}
       />
     </div>
   );

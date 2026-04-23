@@ -63,11 +63,12 @@ interface Props {
   initialStatus?: string;
   initialStale?: string;
   initialQ?: string;
+  auditCounts?: Record<string, { critical: number; warning: number; info: number }>;
 }
 
 const PER_PAGE_OPTIONS = [10, 25, 50];
 
-export function ArticlesTable({ articles, projectId, initialStatus, initialStale, initialQ }: Props) {
+export function ArticlesTable({ articles, projectId, initialStatus, initialStale, initialQ, auditCounts }: Props) {
   const router = useRouter();
   const [status, setStatus] = useState<StatusFilter>((initialStatus as StatusFilter) ?? "all");
   const [stale, setStale] = useState<StaleFilter>((initialStale as StaleFilter) ?? "all");
@@ -320,6 +321,7 @@ export function ArticlesTable({ articles, projectId, initialStatus, initialStale
                   { label: "GEO Skoru" },
                   { label: "Pozisyon", title: "Google'daki ortalama sıralama (GSC verisi)" },
                   { label: "Tıklama/ay", title: "Son 90 gün toplam tıklama (GSC verisi)" },
+                  { label: "SEO", title: "Açık teknik SEO sorunları" },
                   { label: "Son Güncelleme" },
                   { label: "Aksiyonlar" },
                 ].map(({ label, title }) => (
@@ -336,7 +338,7 @@ export function ArticlesTable({ articles, projectId, initialStatus, initialStale
             <tbody>
               {paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-20 text-center">
+                  <td colSpan={10} className="py-20 text-center">
                     <p className="text-muted text-sm">
                       {articles.length === 0
                         ? "Henüz makale yok. İlk taramanızı başlatın!"
@@ -438,6 +440,33 @@ export function ArticlesTable({ articles, projectId, initialStatus, initialStale
                       ) : (
                         <span className="text-xs text-border">—</span>
                       )}
+                    </td>
+
+                    {/* SEO audit badge */}
+                    <td className="px-4 py-3">
+                      {(() => {
+                        const counts = auditCounts?.[a.id];
+                        const total = counts ? counts.critical + counts.warning + counts.info : 0;
+                        if (!counts || total === 0) return <span className="text-xs text-border">—</span>;
+                        const parts: string[] = [];
+                        if (counts.critical > 0) parts.push(`${counts.critical} kritik`);
+                        if (counts.warning > 0)  parts.push(`${counts.warning} uyarı`);
+                        if (counts.info > 0)     parts.push(`${counts.info} bilgi`);
+                        return (
+                          <span
+                            title={parts.join(", ")}
+                            className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-ui font-semibold border ${
+                              counts.critical > 0
+                                ? "bg-red-400/10 text-red-400 border-red-400/30"
+                                : counts.warning > 0
+                                ? "bg-yellow-400/10 text-yellow-400 border-yellow-400/30"
+                                : "bg-tech-blue/10 text-tech-blue border-tech-blue/30"
+                            }`}
+                          >
+                            {total} sorun
+                          </span>
+                        );
+                      })()}
                     </td>
 
                     <td className="px-4 py-3 text-xs text-muted whitespace-nowrap">

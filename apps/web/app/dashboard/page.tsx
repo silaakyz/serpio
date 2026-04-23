@@ -2,8 +2,8 @@ import { auth } from "@/lib/auth";
 import { ScrapeStarter } from "@/components/dashboard/ScrapeStarter";
 import Link from "next/link";
 import { db } from "@serpio/database";
-import { articles, projects, jobs, users } from "@serpio/database";
-import { eq, ne, count, and, desc } from "@serpio/database";
+import { articles, projects, jobs, users, siteAuditSnapshots, siteAuditIssues } from "@serpio/database";
+import { eq, ne, count, and, desc, isNull } from "@serpio/database";
 
 const JOB_TYPE_LABELS: Record<string, string> = {
   scrape:       "Web Taraması",
@@ -73,6 +73,28 @@ export default async function DashboardPage() {
     publishedArticles = publishedResult?.count ?? 0;
   }
 
+  // Site sağlığı
+  let healthScore: number | null = null;
+  let criticalAuditCount = 0;
+
+  if (project) {
+    const snapshot = await db.query.siteAuditSnapshots.findFirst({
+      where: eq(siteAuditSnapshots.projectId, project.id),
+      orderBy: [desc(siteAuditSnapshots.createdAt)],
+    });
+    healthScore = snapshot?.healthScore ?? null;
+
+    const [critResult] = await db
+      .select({ count: count() })
+      .from(siteAuditIssues)
+      .where(and(
+        eq(siteAuditIssues.projectId, project.id),
+        eq(siteAuditIssues.severity, "critical"),
+        isNull(siteAuditIssues.resolvedAt),
+      ));
+    criticalAuditCount = critResult?.count ?? 0;
+  }
+
   const credits = user?.credits ?? 100;
 
   const stats = [
@@ -99,6 +121,26 @@ export default async function DashboardPage() {
         <p className="mt-1 text-sm text-muted font-ui">İşte projenizin güncel durumu.</p>
       </div>
 
+      {/* Kritik SEO sorun banner */}
+      {criticalAuditCount > 0 && (
+        <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-xl text-sm font-ui"
+             style={{
+               backgroundColor: "rgba(239,68,68,0.08)",
+               border: "1px solid rgba(239,68,68,0.3)",
+               color: "#FF4444",
+             }}>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full animate-pulse flex-shrink-0 bg-red-400" />
+            ⚠️ {criticalAuditCount} kritik SEO sorunu tespit edildi. Hemen inceleyin.
+          </div>
+          <Link href="/dashboard/audit"
+                className="flex-shrink-0 text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors"
+                style={{ backgroundColor: "rgba(239,68,68,0.15)" }}>
+            İncele →
+          </Link>
+        </div>
+      )}
+
       {/* Düşük kredi uyarı banner */}
       {credits < 50 && (
         <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-xl text-sm font-ui"
@@ -123,7 +165,7 @@ export default async function DashboardPage() {
       )}
 
       {/* İstatistik Kartları */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {stats.map((s) => (
           <div key={s.label} className="bg-surface border border-border rounded-xl p-6 space-y-3">
             <div className="flex items-center justify-between">
@@ -136,6 +178,29 @@ export default async function DashboardPage() {
             </div>
           </div>
         ))}
+
+        {/* Site Sağlığı kartı */}
+        <Link
+          href="/dashboard/audit"
+          className="bg-surface border border-border rounded-xl p-6 space-y-3 hover:border-border/60 transition-colors"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-muted text-xs font-ui uppercase tracking-wider">Site Sağlığı</span>
+            <span className="text-xl">🏥</span>
+          </div>
+          <div>
+            <p className={`text-3xl font-display font-bold ${
+              healthScore === null ? "text-muted" :
+              healthScore >= 80    ? "text-emerald" :
+              healthScore >= 50    ? "text-yellow-400" : "text-red-400"
+            }`}>
+              {healthScore !== null ? healthScore : "—"}
+            </p>
+            <p className="text-xs text-muted font-ui mt-1">
+              {healthScore !== null ? `/ 100 puan` : "Henüz tarama yok"}
+            </p>
+          </div>
+        </Link>
       </div>
 
       {/* Hızlı Aksiyonlar */}
