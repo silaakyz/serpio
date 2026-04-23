@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { ScrapeStarter } from "@/components/dashboard/ScrapeStarter";
 import Link from "next/link";
 import { db } from "@serpio/database";
-import { articles, projects, jobs, users, siteAuditSnapshots, siteAuditIssues } from "@serpio/database";
+import { articles, projects, jobs, users, siteAuditSnapshots, siteAuditIssues, cannibalizationIssues } from "@serpio/database";
 import { eq, ne, count, and, desc, isNull } from "@serpio/database";
 
 const JOB_TYPE_LABELS: Record<string, string> = {
@@ -76,6 +76,9 @@ export default async function DashboardPage() {
   // Site sağlığı
   let healthScore: number | null = null;
   let criticalAuditCount = 0;
+  let decayCriticalCount = 0;
+  let cannibalCount = 0;
+  let allOk = false;
 
   if (project) {
     const snapshot = await db.query.siteAuditSnapshots.findFirst({
@@ -93,6 +96,28 @@ export default async function DashboardPage() {
         isNull(siteAuditIssues.resolvedAt),
       ));
     criticalAuditCount = critResult?.count ?? 0;
+
+    // Decay riski yüksek makaleler
+    const [decayResult] = await db
+      .select({ count: count() })
+      .from(articles)
+      .where(and(
+        eq(articles.projectId, project.id),
+        eq(articles.decayRiskLevel, "critical"),
+      ));
+    decayCriticalCount = decayResult?.count ?? 0;
+
+    // Kanibalizasyon sorunları
+    const [cannibalResult] = await db
+      .select({ count: count() })
+      .from(cannibalizationIssues)
+      .where(and(
+        eq(cannibalizationIssues.projectId, project.id),
+        eq(cannibalizationIssues.status, "open"),
+      ));
+    cannibalCount = cannibalResult?.count ?? 0;
+
+    allOk = criticalAuditCount === 0 && decayCriticalCount === 0 && cannibalCount === 0;
   }
 
   const credits = user?.credits ?? 100;
@@ -138,6 +163,42 @@ export default async function DashboardPage() {
                 style={{ backgroundColor: "rgba(239,68,68,0.15)" }}>
             İncele →
           </Link>
+        </div>
+      )}
+
+      {/* Decay risk banner */}
+      {decayCriticalCount > 0 && (
+        <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-xl text-sm font-ui bg-orange-400/8 border border-orange-400/30 text-orange-400">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full animate-pulse flex-shrink-0 bg-orange-400" />
+            🔴 <strong className="mx-1">{decayCriticalCount}</strong> makaleniz sıralama kaybetme riski taşıyor. Şimdi harekete geçin!
+          </div>
+          <Link href="/dashboard/predictions"
+                className="flex-shrink-0 text-xs px-3 py-1.5 rounded-lg font-semibold bg-orange-400/15 transition-colors">
+            Tahminleri Gör →
+          </Link>
+        </div>
+      )}
+
+      {/* Kanibalizasyon banner */}
+      {cannibalCount > 0 && (
+        <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-xl text-sm font-ui bg-yellow-400/8 border border-yellow-400/30 text-yellow-400">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full animate-pulse flex-shrink-0 bg-yellow-400" />
+            🟡 <strong className="mx-1">{cannibalCount}</strong> makale çifti aynı konuyu hedefliyor — kanibalizasyon riski!
+          </div>
+          <Link href="/dashboard/predictions"
+                className="flex-shrink-0 text-xs px-3 py-1.5 rounded-lg font-semibold bg-yellow-400/15 transition-colors">
+            İncele →
+          </Link>
+        </div>
+      )}
+
+      {/* Her şey yolunda banner */}
+      {allOk && totalArticles > 0 && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-ui bg-emerald/8 border border-emerald/30 text-emerald">
+          <span>✓</span>
+          İçerikleriniz iyi durumda — kritik risk tespit edilmedi.
         </div>
       )}
 

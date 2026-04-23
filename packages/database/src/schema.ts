@@ -62,6 +62,8 @@ export const jobTypeEnum = pgEnum("job_type", [
   "ga_sync",
   "competitor_crawl",
   "content_gap",
+  "decay_analysis",
+  "cannibalization",
 ]);
 
 export const jobStatusEnum = pgEnum("job_status", [
@@ -238,8 +240,9 @@ export const articles = pgTable(
     monthlyClicks:      integer("monthly_clicks"),
     monthlyImpressions: integer("monthly_impressions"),
 
-    decayRiskScore:     integer("decay_risk_score"),
-    decayRiskLevel:     text("decay_risk_level"),
+    decayRiskScore:      integer("decay_risk_score"),
+    decayRiskLevel:      text("decay_risk_level"),
+    predictedDecayDate:  timestamp("predicted_decay_date", { mode: "date" }),
     conversionScore:    real("conversion_score"),
     monthlyConversions: integer("monthly_conversions"),
     croSuggestions:     json("cro_suggestions").$type<string[]>().default([]),
@@ -531,6 +534,23 @@ export const gaMetrics = pgTable(
   })
 );
 
+// ─── Kanibalizasyon Sorunları ─────────────────────────────────────────────────
+
+export const cannibalizationIssues = pgTable("cannibalization_issues", {
+  id:                  text("id").primaryKey().$defaultFn(() => createId()),
+  projectId:           text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  articleIdA:          text("article_id_a").notNull().references(() => articles.id, { onDelete: "cascade" }),
+  articleIdB:          text("article_id_b").notNull().references(() => articles.id, { onDelete: "cascade" }),
+  overlappingKeywords: json("overlapping_keywords").$type<string[]>().default([]),
+  similarityScore:     real("similarity_score").notNull(),
+  recommendation:      text("recommendation"),
+  status:              text("status").notNull().default("open"),
+  detectedAt:          timestamp("detected_at", { mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  projectIdx: index("cannibalization_project_idx").on(table.projectId),
+  statusIdx:  index("cannibalization_status_idx").on(table.status),
+}));
+
 // ─── Rakipler ─────────────────────────────────────────────────────────────────
 
 export const competitors = pgTable("competitors", {
@@ -617,7 +637,8 @@ export type SiteAuditIssue     = typeof siteAuditIssues.$inferSelect;
 export type SiteAuditSnapshot  = typeof siteAuditSnapshots.$inferSelect;
 export type GscMetric          = typeof gscMetrics.$inferSelect;
 export type GaMetric           = typeof gaMetrics.$inferSelect;
-export type Competitor         = typeof competitors.$inferSelect;
+export type CannibalizationIssue = typeof cannibalizationIssues.$inferSelect;
+export type Competitor           = typeof competitors.$inferSelect;
 export type CompetitorPage     = typeof competitorPages.$inferSelect;
 export type CompetitorChange   = typeof competitorChanges.$inferSelect;
 export type ContentGap         = typeof contentGaps.$inferSelect;

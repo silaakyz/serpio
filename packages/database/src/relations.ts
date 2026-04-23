@@ -15,6 +15,7 @@ import {
   gaMetrics,
   siteAuditIssues,
   siteAuditSnapshots,
+  cannibalizationIssues,
   competitors,
   competitorPages,
   competitorChanges,
@@ -49,10 +50,11 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   googleConnection:    one(googleConnections, { fields: [projects.id], references: [googleConnections.projectId] }),
   gscMetrics:          many(gscMetrics),
   gaMetrics:           many(gaMetrics),
-  siteAuditIssues:     many(siteAuditIssues),
-  siteAuditSnapshots:  many(siteAuditSnapshots),
-  competitors:         many(competitors),
-  contentGaps:         many(contentGaps),
+  siteAuditIssues:       many(siteAuditIssues),
+  siteAuditSnapshots:    many(siteAuditSnapshots),
+  cannibalizationIssues: many(cannibalizationIssues),
+  competitors:           many(competitors),
+  contentGaps:           many(contentGaps),
 }));
 
 export const articlesRelations = relations(articles, ({ one, many }) => ({
@@ -133,4 +135,10 @@ export const competitorChangesRelations = relations(competitorChanges, ({ one })
 
 export const contentGapsRelations = relations(contentGaps, ({ one }) => ({
   project: one(projects, { fields: [contentGaps.projectId], references: [projects.id] }),
+}));
+
+export const cannibalizationIssuesRelations = relations(cannibalizationIssues, ({ one }) => ({
+  project:  one(projects,  { fields: [cannibalizationIssues.projectId],  references: [projects.id]  }),
+  articleA: one(articles,  { fields: [cannibalizationIssues.articleIdA], references: [articles.id], relationName: "cannibal_a" }),
+  articleB: one(articles,  { fields: [cannibalizationIssues.articleIdB], references: [articles.id], relationName: "cannibal_b" }),
 }));

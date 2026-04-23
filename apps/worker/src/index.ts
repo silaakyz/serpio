@@ -6,6 +6,7 @@ import publishWorker from "./processors/publish.processor";
 import geoWorker from "./processors/geo.processor";
 import gscSyncWorker from "./processors/gsc-sync.processor";
 import competitorWorker from "./processors/competitor.processor";
+import predictionsWorker from "./processors/predictions.processor";
 import { gscSyncQueue } from "./queues/gsc-sync.queue";
 import { competitorQueue } from "./queues/competitor.queue";
 import { AI_PROVIDER, AI_MODEL } from "./lib/ai-client";
@@ -17,6 +18,7 @@ console.log("🚀 Publish worker aktif — kuyruk dinleniyor...");
 console.log("🌐 GEO worker aktif — kuyruk dinleniyor...");
 console.log("📊 GSC Sync worker aktif — kuyruk dinleniyor...");
 console.log("🎯 Competitor worker aktif — kuyruk dinleniyor...");
+console.log("🔮 Predictions worker aktif — kuyruk dinleniyor...");
 console.log(`   Redis:    ${process.env.REDIS_URL ?? "redis://127.0.0.1:6380"}`);
 console.log(`   DB:       ${(process.env.DATABASE_URL ?? "not set").replace(/:[^:@]*@/, ":***@")}`);
 console.log(`   AI:       ${AI_PROVIDER} / ${AI_MODEL}`);
@@ -84,6 +86,7 @@ async function shutdown(signal: string) {
   await geoWorker.close();
   await gscSyncWorker.close();
   await competitorWorker.close();
+  await predictionsWorker.close();
   process.exit(0);
 }
 
